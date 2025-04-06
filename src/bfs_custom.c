@@ -70,4 +70,4 @@ void free_graph_data_structure(void) {
 //user should change is function if distribution(and counts) of vertices is changed
 size_t get_nlocalverts_for_pred(void) {
 	return g.nlocalverts;
-}
+}  

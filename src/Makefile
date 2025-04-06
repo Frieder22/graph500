@@ -1,4 +1,5 @@
-CFLAGS = -Drestrict=__restrict__ -O3 -DGRAPH_GENERATOR_MPI -DREUSE_CSR_FOR_VALIDATION -I../aml
+CFLAGS = -Drestrict=__restrict__ -O3 -DGRAPH_GENERATOR_MPI -DREUSE_CSR_FOR_VALIDATION -I../aml -fcommon
+# added -fcommon to avoid dublicated variable conflicts
 LDFLAGS = -lpthread
 MPICC = mpicc
 
