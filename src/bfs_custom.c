@@ -13,6 +13,9 @@
 #include <assert.h>
 #include <stdint.h>
 
+// added by me
+#include <stdio.h>
+
 //VISITED bitmap parameters
 unsigned long *visited;
 int64_t visited_size;
@@ -21,22 +24,76 @@ int64_t *pred_glob,*column;
 int *rowstarts;
 oned_csr_graph g;
 
+// new and old local frontiers
+size_t *front_new, *front_old;
+// size of corresponding local frontiers
+size_t front_new_size, front_old_size;
+
 //user should provide this function which would be called once to do kernel 1: graph convert
 void make_graph_data_structure(const tuple_graph* const tg) {
-	//graph conversion, can be changed by user by replacing oned_csr.{c,h} with new graph format 
-	convert_graph_to_oned_csr(tg, &g);
+	//graph conversion, can be changed by user by replacing oned_csr.{c,h} with new graph format
 
+	// only rank 0 holds correct edge list
+	// distribute edges equally to the processes
+	int64_t nlocaledges = tg->nglobaledges / size; // every process has correct nglobaledges
+	packed_edge* local_edges;
+	local_edges = malloc(sizeof(packed_edge) * nlocaledges);
+	MPI_Scatter(tg->edgememory,
+				nlocaledges,
+				packed_edge_mpi_type, // mpi_Type is already provided by framework
+				local_edges,
+				nlocaledges,
+				packed_edge_mpi_type,
+				0,  // rank 0 has all edges
+				MPI_COMM_WORLD);
+											   
+	if (rank == 1){
+		printf("Edges from rank %d\n", rank);
+		for (size_t i = 0; i < 10; i++) {
+			printf("%d to %d | ", local_edges[i].v0_low, local_edges[i].v1_low);
+		}
+		printf("%d to %d\n ", local_edges[10].v0_low, local_edges[10].v1_low);
+	}
+	
+
+	if (rank==0) {
+		printf("original edges from rank 1:\n");
+		for (size_t i = nlocaledges; i < nlocaledges + 10; i++) {
+			printf("%d to %d | ", tg->edgememory[i].v0_low, tg->edgememory[i].v1_low);
+		}
+		printf("%d to %d\n ", tg->edgememory[nlocaledges + 10].v0_low, tg->edgememory[nlocaledges + 10].v1_low);
+	}
+	convert_graph_to_oned_csr(tg, &g);
 	column=g.column;
+
+	// create bitmap, where visited vertices are stored
 	visited_size = (g.nlocalverts + ulong_bits - 1) / ulong_bits;
 	visited = xmalloc(visited_size*sizeof(unsigned long));
 	//user code to allocate other buffers for bfs
+
 }
 
 //user should provide this function which would be called several times to do kernel 2: breadth first search
 //pred[] should be root for root, -1 for unrechable vertices
 //prior to calling run_bfs pred is set to -1 by calling clean_pred
 void run_bfs(int64_t root, int64_t* pred) {
+	// allocate memory for frontiers
+	front_new = (size_t*) malloc(sizeof(size_t) * g.nglobalverts);
+	front_old = (size_t*) malloc(sizeof(size_t) * g.nglobalverts);
+	front_new_size = 0;
+	front_old_size = 0;
+
+	if (VERTEX_OWNER(root)==rank) {
+		pred[VERTEX_LOCAL(root)] = root;
+		SET_VISITED(root);
+
+		// add root to local front
+		front_new[0] = root;
+		front_new_size = 1;
+	}
+	
 	pred_glob=pred;
+	printf("Predecessor local= %ld", pred[0]);
 	//user code to do bfs
 }
 
