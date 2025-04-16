@@ -3,6 +3,7 @@
 #include "common.h"
 #include "aml.h"
 #include "csr_reference.h"
+#include "csr_custom.h"
 #include "bitmap_reference.h"
 #include <stdint.h>
 #include <inttypes.h>
@@ -22,7 +23,9 @@ int64_t visited_size;
 
 int64_t *pred_glob,*column;
 int *rowstarts;
-oned_csr_graph g;
+oned_csr_graph g_old;
+distributedGraph_CSR graph;
+
 
 // new and old local frontiers
 size_t *front_new, *front_old;
@@ -33,41 +36,12 @@ size_t front_new_size, front_old_size;
 void make_graph_data_structure(const tuple_graph* const tg) {
 	//graph conversion, can be changed by user by replacing oned_csr.{c,h} with new graph format
 
-	// only rank 0 holds correct edge list
-	// distribute edges equally to the processes
-	int64_t nlocaledges = tg->nglobaledges / size; // every process has correct nglobaledges
-	packed_edge* local_edges;
-	local_edges = malloc(sizeof(packed_edge) * nlocaledges);
-	MPI_Scatter(tg->edgememory,
-				nlocaledges,
-				packed_edge_mpi_type, // mpi_Type is already provided by framework
-				local_edges,
-				nlocaledges,
-				packed_edge_mpi_type,
-				0,  // rank 0 has all edges
-				MPI_COMM_WORLD);
-											   
-	if (rank == 1){
-		printf("Edges from rank %d\n", rank);
-		for (size_t i = 0; i < 10; i++) {
-			printf("%d to %d | ", local_edges[i].v0_low, local_edges[i].v1_low);
-		}
-		printf("%d to %d\n ", local_edges[10].v0_low, local_edges[10].v1_low);
-	}
-	
-
-	if (rank==0) {
-		printf("original edges from rank 1:\n");
-		for (size_t i = nlocaledges; i < nlocaledges + 10; i++) {
-			printf("%d to %d | ", tg->edgememory[i].v0_low, tg->edgememory[i].v1_low);
-		}
-		printf("%d to %d\n ", tg->edgememory[nlocaledges + 10].v0_low, tg->edgememory[nlocaledges + 10].v1_low);
-	}
-	convert_graph_to_oned_csr(tg, &g);
-	column=g.column;
+	printf("Hello from rank %d\n", rank);
+	convert_graph_to_oned_csr(tg, &g_old);
+	column=g_old.column;
 
 	// create bitmap, where visited vertices are stored
-	visited_size = (g.nlocalverts + ulong_bits - 1) / ulong_bits;
+	visited_size = (g_old.nlocalverts + ulong_bits - 1) / ulong_bits;
 	visited = xmalloc(visited_size*sizeof(unsigned long));
 	//user code to allocate other buffers for bfs
 
@@ -78,8 +52,8 @@ void make_graph_data_structure(const tuple_graph* const tg) {
 //prior to calling run_bfs pred is set to -1 by calling clean_pred
 void run_bfs(int64_t root, int64_t* pred) {
 	// allocate memory for frontiers
-	front_new = (size_t*) malloc(sizeof(size_t) * g.nglobalverts);
-	front_old = (size_t*) malloc(sizeof(size_t) * g.nglobalverts);
+	front_new = (size_t*) malloc(sizeof(size_t) * g_old.nglobalverts);
+	front_old = (size_t*) malloc(sizeof(size_t) * g_old.nglobalverts);
 	front_new_size = 0;
 	front_old_size = 0;
 
@@ -102,9 +76,9 @@ void run_bfs(int64_t root, int64_t* pred) {
 void get_edge_count_for_teps(int64_t* edge_visit_count) {
 	long i,j;
 	long edge_count=0;
-	for(i=0;i<g.nlocalverts;i++)
+	for(i=0;i<g_old.nlocalverts;i++)
 		if(pred_glob[i]!=-1) {
-			for(j=g.rowstarts[i];j<g.rowstarts[i+1];j++)
+			for(j=g_old.rowstarts[i];j<g_old.rowstarts[i+1];j++)
 				if(COLUMN(j)<=VERTEX_TO_GLOBAL(my_pe(),i))
 					edge_count++;
 		}
@@ -115,16 +89,16 @@ void get_edge_count_for_teps(int64_t* edge_visit_count) {
 //user provided function to initialize predecessor array to whatevere value user needs
 void clean_pred(int64_t* pred) {
 	int i;
-	for(i=0;i<g.nlocalverts;i++) pred[i]=-1;
+	for(i=0;i<g_old.nlocalverts;i++) pred[i]=-1;
 }
 
 //user provided function to be called once graph is no longer needed
 void free_graph_data_structure(void) {
-	free_oned_csr_graph(&g);
+	free_oned_csr_graph(&g_old);
 	free(visited);
 }
 
 //user should change is function if distribution(and counts) of vertices is changed
 size_t get_nlocalverts_for_pred(void) {
-	return g.nlocalverts;
+	return g_old.nlocalverts;
 }  
