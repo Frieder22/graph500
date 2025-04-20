@@ -35,9 +35,10 @@ size_t front_new_size, front_old_size;
 //user should provide this function which would be called once to do kernel 1: graph convert
 void make_graph_data_structure(const tuple_graph* const tg) {
 	//graph conversion, can be changed by user by replacing oned_csr.{c,h} with new graph format
-
-	printf("Hello from rank %d\n", rank);
-	convert_graph_to_oned_csr(tg, &g_old);
+	
+	createDistributedGraph(tg, &graph);
+	//convert_graph_to_oned_csr(tg, &g_old);
+	
 	column=g_old.column;
 
 	// create bitmap, where visited vertices are stored
