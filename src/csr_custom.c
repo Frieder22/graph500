@@ -18,7 +18,8 @@ void divideTuplegraph_divisible(tuple_graph* const tg){
 				packed_edge_mpi_type,
 				0,  // rank 0 has all edges
 				MPI_COMM_WORLD);
-	tg->edgememory = local_edges;				
+	tg->edgememory = local_edges;
+	tg->nlocaledeges = nlocaledges;				
 }
 
 uint64_t* getVertexSpacing(tuple_graph* tg){
@@ -43,8 +44,9 @@ uint64_t* getVertexSpacing(tuple_graph* tg){
 		vertexCount[i] += vertexCount[i-1];
 	}
 	
-	printf("last entry: %ld  local edges: %ld", vertexCount[tg->nglobalverts - 1], tg->nlocaledeges);
+	printf("last entry: %ld  local edges: %ld\n", vertexCount[tg->nglobalverts - 1], tg->nlocaledeges);
 
+	assert(vertexCount[tg->nglobalverts - 3] == 2*tg->nlocaledeges); // Error in counting the edges 
 	return vertexCount;
 
 }
@@ -53,9 +55,12 @@ uint64_t* getVertexSpacing(tuple_graph* tg){
 void createDistributedGraph(const tuple_graph* const tg, distributedGraph_CSR* const graph){
     graph->nGlobalEdges = tg->nglobaledges;
     
+
     // devide edges equally on threads
     divideTuplegraph_divisible(tg);
 
-	//getVertexSpacing(tg);
+
+
+	getVertexSpacing(tg);
 	graph->nLocaledges = tg->nlocaledeges;
 }
