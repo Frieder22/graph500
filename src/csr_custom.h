@@ -7,8 +7,8 @@
 typedef struct{
     size_t nGlobalEdges;
     size_t nLocaledges;
-    uint64_t data;
-    size_t* reference;
+    uint64_t* data;
+    size_t* indices;
 } distributedGraph_CSR;
 
 /**

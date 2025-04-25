@@ -22,32 +22,34 @@ void divideTuplegraph_divisible(tuple_graph* const tg){
 	tg->nlocaledeges = nlocaledges;				
 }
 
-uint64_t* getVertexSpacing(tuple_graph* tg){
-	uint64_t* vertexCount;
-	vertexCount = (uint64_t*) malloc(tg->nglobalverts * sizeof(uint64_t));
+size_t* getVertexSpacing(tuple_graph* tg){
+	size_t* vertexCount;
+	vertexCount = (size_t*) malloc(tg->nglobalverts * sizeof(size_t));
 	
 	// initialize with 0
-	for (uint64_t i = 0; i < tg->nglobalverts; i++) {
+	for (size_t i = 0; i < tg->nglobalverts; i++) {
 		vertexCount[i] = 0;
 	}
 
 	// count occurence of each vertex
 	packed_edge edge;	
-	for (uint64_t i = 0; i < tg->nlocaledeges; i++) {
+	for (size_t i = 0; i < tg->nlocaledeges; i++) {
 		edge = tg->edgememory[i];
 		vertexCount[edge.v0_low]++;
 		vertexCount[edge.v1_low]++;
 	}
 
 	// perform scan to get starting positions in CSR
-	for (uint64_t i = 1; i < tg->nglobalverts; i++) {
+	for (size_t i = 1; i < tg->nglobalverts; i++) {
 		vertexCount[i] += vertexCount[i-1];
 	}
-	
-	printf("last entry: %ld  local edges: %ld\n", vertexCount[tg->nglobalverts - 1], tg->nlocaledeges);
 
 	assert(vertexCount[tg->nglobalverts - 3] == 2*tg->nlocaledeges); // Error in counting the edges 
 	return vertexCount;
+
+}
+
+uint64_t* getDataArray(){
 
 }
 
@@ -58,9 +60,11 @@ void createDistributedGraph(const tuple_graph* const tg, distributedGraph_CSR* c
 
     // devide edges equally on threads
     divideTuplegraph_divisible(tg);
-
-
-
-	getVertexSpacing(tg);
 	graph->nLocaledges = tg->nlocaledeges;
+
+	// get indices for each vertex
+	graph->indices = getVertexSpacing(tg);		
+
+	// fill data array
+	printf("Hello\n");
 }
