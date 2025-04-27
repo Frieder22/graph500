@@ -7,8 +7,8 @@
 typedef struct{
     size_t nGlobalEdges;
     size_t nLocaledges;
-    uint64_t* data;
-    size_t* indices;
+    uint32_t* data;
+    uint64_t* indices;
 } distributedGraph_CSR;
 
 /**
@@ -28,7 +28,7 @@ void createDistributedGraph(const tuple_graph* const tg, distributedGraph_CSR* c
  * Find neighbours of a vertex
  * @todo implementation
  */
-size_t getNeighbours(distributedGraph_CSR* const); 
+uint32_t* getNeighbours(distributedGraph_CSR* const graph, uint32_t* vertex); 
 
 /**
  * Correct cleanup of distributed graph struct
