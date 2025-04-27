@@ -115,4 +115,7 @@ void createDistributedGraph(const tuple_graph* const tg, distributedGraph_CSR* c
 	setDataArray(tg, graph);
 }
 
-uint32_t* getNeighbours(distributedGraph_CSR* const graph, uint32_t* vertex)
+void getNeighbours(distributedGraph_CSR* const graph, uint32_t vertex,  uint32_t* start, uint32_t* end){
+	start = graph->data[graph->indices[vertex]];
+	end = graph->data[graph->indices[vertex + 1]];
+}

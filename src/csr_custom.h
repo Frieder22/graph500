@@ -25,10 +25,10 @@ void divideTuplegraph_divisible(tuple_graph* const tg);
 void createDistributedGraph(const tuple_graph* const tg, distributedGraph_CSR* const graph);
 
 /**
- * Find neighbours of a vertex
- * @todo implementation
+ * Find neighbours of a vertex.
+ * @return start and pointer of array
  */
-uint32_t* getNeighbours(distributedGraph_CSR* const graph, uint32_t* vertex); 
+void getNeighbours(distributedGraph_CSR* const graph, uint32_t vertex, uint32_t* start,  uint32_t* end); 
 
 /**
  * Correct cleanup of distributed graph struct
