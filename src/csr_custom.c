@@ -119,3 +119,9 @@ void getNeighbours(distributedGraph_CSR* const graph, uint32_t vertex,  uint32_t
 	start = graph->data[graph->indices[vertex]];
 	end = graph->data[graph->indices[vertex + 1]];
 }
+
+void freeDistributedGraph(distributedGraph_CSR* const graph){
+	free(graph->data);
+	free(graph->indices);
+	free(graph);
+}
