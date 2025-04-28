@@ -20,6 +20,10 @@ typedef struct{
 void createDistributedGraph(const tuple_graph* const tg, distributedGraph_CSR* const graph);
 
 /**
+ * Prints neighbors of vertex "vertex"
+ */
+void printNeighbors(distributedGraph_CSR* const graph, uint32_t vertex, int checkRank);
+/**
  * Find neighbours of a vertex.
  * @return start and pointer of array
  */
@@ -30,4 +34,8 @@ void getNeighbours(distributedGraph_CSR* const graph, uint32_t vertex, uint32_t*
  */
 void freeDistributedGraph(distributedGraph_CSR* const graph);
 
+
+
+#define START(vertex) (&(graph.data[graph.indices[vertex]]))
+#define END(vertex) (&(graph.data[graph.indices[vertex + 1]]))
 #endif // CSR_CUSTOM_H

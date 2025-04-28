@@ -39,7 +39,16 @@ void make_graph_data_structure(const tuple_graph* const tg) {
 	createDistributedGraph(tg, &graph);
 	//convert_graph_to_oned_csr(tg, &g_old);
 	
-	column=g_old.column;
+	if(rank == 0){
+		uint32_t *start = START(52);
+		uint32_t *end = END(52);
+		printNeighbors(&graph, 52, 0);
+		for (uint32_t *index = start; index != end; ++index) {
+			printf("%ld ", *index);
+		}
+		printf("\n");
+		
+	}
 
 	// create bitmap, where visited vertices are stored
 	visited_size = (g_old.nlocalverts + ulong_bits - 1) / ulong_bits;

@@ -23,7 +23,7 @@ void divideTuplegraph_divisible(tuple_graph* const tg){
 	tg->nlocaledeges = nlocaledges;				
 }
 
-uint64_t* getVertexSpacing(tuple_graph* tg){
+uint64_t* getVertexSpacing(const tuple_graph* const tg){
 	uint64_t* vertexCount;
 	vertexCount = (uint64_t*) malloc((tg->nglobalverts + 1) * sizeof(uint64_t));
 	
@@ -50,7 +50,7 @@ uint64_t* getVertexSpacing(tuple_graph* tg){
 
 }
 
-void setDataArray(tuple_graph* tg, distributedGraph_CSR* const graph){
+void setDataArray(const tuple_graph* const tg, distributedGraph_CSR* const graph){
 	uint32_t* vertexCount;
 	uint32_t* data;
 	uint32_t vertexOffset, vertex1, vertex2;
@@ -89,7 +89,7 @@ void setDataArray(tuple_graph* tg, distributedGraph_CSR* const graph){
 }
 
 
-void printNeighbrs(distributedGraph_CSR* const graph, uint32_t vertex, int checkRank){
+void printNeighbors(distributedGraph_CSR* const graph, uint32_t vertex, int checkRank){
 	packed_edge edge;
 	if (rank == checkRank) {
 		printf("Neighbours of vertex %ld (for rank %d):\n", vertex, rank);
@@ -114,11 +114,12 @@ void createDistributedGraph(const tuple_graph* const tg, distributedGraph_CSR* c
 	// put in data
 	setDataArray(tg, graph);
 }
-
-void getNeighbours(distributedGraph_CSR* const graph, uint32_t vertex,  uint32_t* start, uint32_t* end){
-	start = graph->data[graph->indices[vertex]];
-	end = graph->data[graph->indices[vertex + 1]];
+/*
+void getNeighbours(distributedGraph_CSR* const graph, uint32_t vertex,  uint32_t *start, uint32_t *end){
+	*start = &(graph->data[graph->indices[vertex]]);
+	*end = &(graph->data[graph->indices[vertex + 1]]);
 }
+*/
 
 void freeDistributedGraph(distributedGraph_CSR* const graph){
 	free(graph->data);
