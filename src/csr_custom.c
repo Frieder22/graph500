@@ -25,7 +25,7 @@ void divideTuplegraph_divisible(tuple_graph* const tg){
 
 uint64_t* getVertexSpacing(const tuple_graph* const tg){
 	uint64_t* vertexCount;
-	uint64_t nglobalverts = tg->nglobaledges / 16;
+	uint64_t nglobalverts = tg->nglobaledges / 16; // needs to be calculated correctly
 	vertexCount = (uint64_t*) malloc((nglobalverts + 1) * sizeof(uint64_t));
 	
 	// initialize with 0

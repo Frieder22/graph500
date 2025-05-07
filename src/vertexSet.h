@@ -9,6 +9,7 @@ typedef struct Vertexset{
     size_t size;
     size_t maxsize;
     size_t sizeCrit;
+    bool isdense;
 
     uint64_t *bitarray;
     uint32_t size_bitarray;

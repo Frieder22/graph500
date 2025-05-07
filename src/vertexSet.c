@@ -21,6 +21,9 @@ void Vertexset_Init(Vertexset* vs, uint32_t maxsize){
 
     //calculate size, where dense variant is more efficient
     vs->sizeCrit = size_bitarray * sizeof(uint64_t) / sizeof(32);
+
+    // set default as sparse
+    vs->isdense = false;
 };
 
 void Vertexset_Add(uint32_t vertex, Vertexset* vs);
