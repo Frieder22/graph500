@@ -25,10 +25,11 @@ void divideTuplegraph_divisible(tuple_graph* const tg){
 
 uint64_t* getVertexSpacing(const tuple_graph* const tg){
 	uint64_t* vertexCount;
-	vertexCount = (uint64_t*) malloc((tg->nglobalverts + 1) * sizeof(uint64_t));
+	uint64_t nglobalverts = tg->nglobaledges / 16;
+	vertexCount = (uint64_t*) malloc((nglobalverts + 1) * sizeof(uint64_t));
 	
 	// initialize with 0
-	for (uint64_t i = 0; i < tg->nglobalverts + 1; i++) {
+	for (uint64_t i = 0; i < nglobalverts + 1; i++) {
 		vertexCount[i] = 0;
 	}
 
@@ -41,11 +42,11 @@ uint64_t* getVertexSpacing(const tuple_graph* const tg){
 	}
 
 	// perform scan to get starting positions in CSR
-	for (uint64_t i = 1; i < tg->nglobalverts + 1; i++) {
+	for (uint64_t i = 1; i < nglobalverts + 1; i++) {
 		vertexCount[i] += vertexCount[i-1];
 	}
 
-	assert(vertexCount[tg->nglobalverts] == 2*tg->nlocaledeges); // Error in counting the edges 
+	assert(vertexCount[nglobalverts] == 2*tg->nlocaledeges); // Error in counting the edges 
 	return vertexCount;
 
 }
@@ -56,11 +57,13 @@ void setDataArray(const tuple_graph* const tg, distributedGraph_CSR* const graph
 	uint32_t vertexOffset, vertex1, vertex2;
 	packed_edge edge;
 	
-	vertexCount = (uint32_t*) malloc(tg->nglobalverts * sizeof(uint32_t));
-	data = (uint32_t*) malloc(graph->indices[tg->nglobalverts-1] * sizeof(uint32_t));
+	uint64_t nglobalverts = tg->nglobaledges / 16;
+
+	vertexCount = (uint32_t*) malloc(nglobalverts * sizeof(uint32_t));
+	data = (uint32_t*) malloc(graph->indices[nglobalverts-1] * sizeof(uint32_t));
 
 	// initialize with 0
-	for (uint32_t i = 0; i < tg->nglobalverts; i++) {
+	for (uint32_t i = 0; i < nglobalverts; i++) {
 		vertexCount[i] = 0;
 	}
 
@@ -103,6 +106,9 @@ void printNeighbors(distributedGraph_CSR* const graph, uint32_t vertex, int chec
 void createDistributedGraph(const tuple_graph* const tg, distributedGraph_CSR* const graph){
     // set nGlobaledges
 	graph->nGlobalEdges = tg->nglobaledges;
+
+	// set nGlobalVerts
+	graph->nGlobalVerts = tg->nglobaledges/16;
     
     // divide edges equally on threads
     divideTuplegraph_divisible(tg);
