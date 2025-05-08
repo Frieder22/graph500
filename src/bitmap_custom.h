@@ -1,8 +1,24 @@
-#define ulong_bits_CUSTOM 64
-#define ulong_mask_CUSTOM &63
-#define ulong_shift_CUSTOM >>6
-#define SET_VISITED_CUSTOM(array, v) do {array[VERTEX_LOCAL((v)) ulong_shift] |= (1UL << (VERTEX_LOCAL((v)) ulong_mask));} while (0)
-#define SET_VISITEDLOC_CUSTOM(array, v) do {array[(v) ulong_shift] |= (1ULL << ((v) ulong_mask));} while (0)
-#define TEST_VISITED_CUSTOM(array, v) ((array[VERTEX_LOCAL((v)) ulong_shift] & (1UL << (VERTEX_LOCAL((v)) ulong_mask))) != 0)
-#define TEST_VISITEDLOC_CUSTOM(array, v) ((array[(v) ulong_shift] & (1ULL << ((v) ulong_mask))) != 0)
-#define CLEAN_VISITED_CUSTOM(array, size)  memset(array,0,size*sizeof(unsigned long));
+#if !defined(BITMAP)
+#define BITMAP
+
+#include <stdint.h>
+#include <stdbool.h>
+
+#define ulong_bits 64
+#define ulong_mask &63
+#define ulong_divide >>6
+
+static inline void Bitmap_Set(unsigned long long *array, uint32_t vertex){
+    array[vertex ulong_divide] |= (1ULL << (vertex ulong_mask));
+}
+
+static inline bool Bitmap_Test(unsigned long long *array, uint32_t vertex){
+    return (array[vertex ulong_divide] & (1ULL << (vertex ulong_mask))) != 0;
+}
+
+static inline void Bitmap_Clean(unsigned long long *array, size_t size){
+    memset(array,0,size*sizeof(unsigned long));
+}
+
+
+#endif // BITMAP
