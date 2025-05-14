@@ -92,7 +92,7 @@ void Vertexset_Init(Vertexset* vs, uint32_t maxsize, MPI_Comm MPI_COMM){
     vs->isdense = false;
 };
 
-void Vertexset_Add(Vertexset* vs, uint32_t vertex){
+void Vertexset_Add(Vertexset* vs, uint32_t vertex) {
     assert(vertex < vs->maxsize);
     if (vs->isdense) {
         Bitmap_Set(vs->bitArray, vertex);
@@ -102,7 +102,7 @@ void Vertexset_Add(Vertexset* vs, uint32_t vertex){
     }
 };
 
-bool Vertexset_Contains(Vertexset* vs, uint32_t vertex){
+bool Vertexset_Contains(Vertexset* vs, uint32_t vertex) {
     assert(vertex < vs->maxsize);
     if (vs->isdense) {
         return Bitmap_Test(vs->bitArray, vertex);
@@ -116,7 +116,13 @@ bool Vertexset_Contains(Vertexset* vs, uint32_t vertex){
     }
 };
 
-bool Vertexset_TransformToDense(Vertexset* vs){
+void Vertexset_Clean(Vertexset* vs) {
+    vs->isdense = false;
+    vs->sizeSparse = 0;
+};
+
+
+bool Vertexset_TransformToDense(Vertexset* vs) {
     // only do, if it's sparse
     if (!vs->isdense){
         Bitmap_Clean(vs->bitArray, vs->size_bitarray);
@@ -129,7 +135,7 @@ bool Vertexset_TransformToDense(Vertexset* vs){
     
 };
 
-bool Vertexset_TransformToSparse(Vertexset* vs){
+bool Vertexset_TransformToSparse(Vertexset* vs) {
     // only do, if it is dense
     if (vs->isdense){
         unsigned long long word;

@@ -5,6 +5,9 @@
 #include "csr_reference.h"
 #include "csr_custom.h"
 #include "bitmap_custom.h"
+#include "vertexSet.h"
+#include "vertexSetIterator.h"
+
 #include <stdint.h>
 #include <inttypes.h>
 #include <stdlib.h>
@@ -14,11 +17,12 @@
 #include <assert.h>
 #include <stdint.h>
 
+
 // added by me
 #include <stdio.h>
 
 //VISITED bitmap parameters
-unsigned long *visited, *frontier;
+unsigned long *visited;
 int64_t visited_size;
 
 int64_t *pred_glob,*column;
@@ -26,11 +30,6 @@ int *rowstarts;
 oned_csr_graph g_old;
 distributedGraph_CSR graph;
 
-
-// new and old local frontiers
-size_t *front_new, *front_old;
-// size of corresponding local frontiers
-size_t front_new_size, front_old_size;
 
 //user should provide this function which would be called once to do kernel 1: graph convert
 void make_graph_data_structure(const tuple_graph* const tg) {
@@ -67,20 +66,6 @@ void make_graph_data_structure(const tuple_graph* const tg) {
 	}
 	*/
 
-	// create bitmap, where visited vertices are stored
-	visited_size = (g_old.nglobalverts + ulong_bits - 1) / ulong_bits;
-	visited = xmalloc(visited_size*sizeof(unsigned long));
-	for (uint64_t i = 0; i < visited_size; i++) {
-		visited[i] = (unsigned long) 0;
-	}
-
-	// create bitmap, where new frontier vertices are stored
-	visited_size = (g_old.nglobalverts + ulong_bits - 1) / ulong_bits;
-	frontier = xmalloc(visited_size*sizeof(unsigned long));
-	for (uint64_t i = 0; i < visited_size; i++) {
-		frontier[i] = (unsigned long) 0;
-	}
-
 	/*
 	if (rank==0) {		
 		printf("first array element: %ld\n", visited[0]);
@@ -100,13 +85,55 @@ void make_graph_data_structure(const tuple_graph* const tg) {
 //pred[] should be root for root, -1 for unrechable vertices
 //prior to calling run_bfs pred is set to -1 by calling clean_pred
 void run_bfs(int64_t root, int64_t* pred) {
-	if(VERTEX_OWNER(root) == rank)
-	pred[VERTEX_LOCAL(root)] = root;
+	int64_t nglobalverts = g_old.nglobalverts - 1;
+	// init VertexSets
+	Vertexset visited, frontierOld, frontierNew, temp;
+	Vertexset_Init(&visited, nglobalverts, MPI_COMM_WORLD);
+	Vertexset_Init(&frontierOld, nglobalverts, MPI_COMM_WORLD);
+	Vertexset_Init(&frontierNew, nglobalverts, MPI_COMM_WORLD);
+	Vertexset_TransformToDense(&visited);  //only needs dense representation
+
+	// set in root
+	Vertexset_Add(&visited, root);
+	Vertexset_Add(&frontierOld, root);
+	pred[root] = root;
+
+	vertexSetIterator it;
+	uint32_t vert, neigh;
+	while (frontierOld.sizeSparse != 0) {
+		vertexSetIterator_Init(&it, &frontierOld);
+		while (vertexSetIterator_Has_next(&it)) {
+			Vertexset_Add(&visited, vertexSetIterator_Next(&it));
+		}
+		vertexSetIterator_Reset(&it);
+		while (vertexSetIterator_Has_next(&it)) {
+			vert = vertexSetIterator_Next(&it);
+			printf("START\n");
+			for (size_t i = START(vert); i < END(vert); i++) {
+				neigh = graph.data[i];
+				if (!Vertexset_Contains(&visited, neigh)) {
+					Vertexset_Add(&visited, neigh);
+					Vertexset_Add(&frontierNew, neigh);
+					pred[neigh] = vert;
+				}
+			}
+		}
+		Vertexset_Allreduce_Pure(&frontierNew, VERTEXSET_OR);
+
+		//swap Vertexsets
+		temp = frontierNew;
+		frontierNew = frontierOld;
+		frontierOld = temp;
+
+		Vertexset_Clean(&frontierNew);
+	}
 	
-	//SET_VISITEDLOC_CUSTOM(visited, root);
-	
-	printf("Predecessor local= %ld\n", g_old.nglobalverts);
-	//user code to do bfs
+
+
+	// deinit VertexSets
+	Vertexset_Deinit(&visited);
+	Vertexset_Deinit(&frontierOld);
+	Vertexset_Deinit(&frontierNew);
 }
 
 //we need edge count to calculate teps. Validation will check if this count is correct

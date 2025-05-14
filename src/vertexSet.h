@@ -62,6 +62,13 @@ void Vertexset_Add(Vertexset* vs, uint32_t vertex);
 bool Vertexset_Contains(Vertexset* vs, uint32_t vertex);
 
 /**
+ * Resets the memory of vertexset. After reset the VertexSet is
+ * in sparse representation.
+ * Sparse/Dense O(1)
+ */
+void Vertexset_Clean(Vertexset* vs);
+
+/**
  * Transforms Vertexset to dense representation.
  * Time complexities:
  * Dense: O(1)
