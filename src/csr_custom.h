@@ -28,7 +28,7 @@ void printNeighbors(distributedGraph_CSR* const graph, uint32_t vertex, int chec
  * Find neighbours of a vertex.
  * @return start and pointer of array
  */
-void getNeighbours(distributedGraph_CSR* const graph, uint32_t vertex, uint32_t* start,  uint32_t* end); 
+void getNeighbours(distributedGraph_CSR* const graph, uint32_t vertex, uint64_t* start,  uint64_t* end); 
 
 /**
  * Correct cleanup of distributed graph struct
@@ -37,6 +37,6 @@ void freeDistributedGraph(distributedGraph_CSR* const graph);
 
 
 
-#define START(vertex) (&(graph.data[graph.indices[vertex]]))
-#define END(vertex) (&(graph.data[graph.indices[vertex + 1]]))
+#define NEIGHSTART(graph, vertex) graph->indices[vertex]
+#define NEIGHEND(graph, vertex) graph->indices[vertex + 1]
 #endif // CSR_CUSTOM_H

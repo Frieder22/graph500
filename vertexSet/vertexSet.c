@@ -75,7 +75,7 @@ void Vertexset_Init(Vertexset* vs, uint32_t maxsize, MPI_Comm MPI_COMM){
     
     // init sparse array 
     // allocate to much memory to fill up whole array with all possible
-    // vertices (no dublicates)
+    // vertices (no duplicates)
     vs->sizeSparse = 0;
     vs->sparseArray = (uint32_t*) malloc(maxsize * sizeof(uint32_t));
     vs->sparseBuffer = (uint32_t*) malloc(maxsize * sizeof(uint32_t));
@@ -182,6 +182,16 @@ void Vertexset_Allreduce_Pure(Vertexset* vs, int VERTEXSET_OPERATION){
         for (int i = 1; i < vs->mpi_size + 1; i++){
             vs->displ[i] = vs->displ[i-1] + vs->sizesAll[i-1];
         }
+
+        // Ceck, if resulting array would be too big
+        if(vs->displ[vs->mpi_size] < vs->maxsize){
+            // Do dense communication
+            Vertexset_TransformToDense(vs);
+            Vertexset_Allreduce_Pure(vs, VERTEXSET_OPERATION);
+            vs->sizeSparse = 1;
+            return;
+        }
+
 
         // gather of all subarrays
         MPI_Allgatherv(vs->sparseArray, vs->sizeSparse, MPI_UINT32_T, vs->sparseBuffer, vs->sizesAll, (vs->displ), MPI_UINT32_T, vs->MPI_COMM);

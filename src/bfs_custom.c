@@ -85,7 +85,7 @@ void make_graph_data_structure(const tuple_graph* const tg) {
 //pred[] should be root for root, -1 for unrechable vertices
 //prior to calling run_bfs pred is set to -1 by calling clean_pred
 void run_bfs(int64_t root, int64_t* pred) {
-	int64_t nglobalverts = g_old.nglobalverts - 1;
+	int64_t nglobalverts = g_old.nglobalverts-1;
 	// init VertexSets
 	Vertexset visited, frontierOld, frontierNew, temp;
 	Vertexset_Init(&visited, nglobalverts, MPI_COMM_WORLD);
@@ -103,13 +103,16 @@ void run_bfs(int64_t root, int64_t* pred) {
 	while (frontierOld.sizeSparse != 0) {
 		vertexSetIterator_Init(&it, &frontierOld);
 		while (vertexSetIterator_Has_next(&it)) {
-			Vertexset_Add(&visited, vertexSetIterator_Next(&it));
+			uint32_t vertBefore = vert;
+			vert = vertexSetIterator_Next(&it);
+			if(!(vert<nglobalverts))
+				printf("%d\n", vertBefore);
+			Vertexset_Add(&visited, vert);
 		}
 		vertexSetIterator_Reset(&it);
 		while (vertexSetIterator_Has_next(&it)) {
 			vert = vertexSetIterator_Next(&it);
-			printf("START\n");
-			for (size_t i = START(vert); i < END(vert); i++) {
+			for (size_t i = NEIGHSTART((&graph), vert); i < NEIGHEND((&graph),vert); i++) {
 				neigh = graph.data[i];
 				if (!Vertexset_Contains(&visited, neigh)) {
 					Vertexset_Add(&visited, neigh);
@@ -118,17 +121,21 @@ void run_bfs(int64_t root, int64_t* pred) {
 				}
 			}
 		}
+		//Vertexset_PrintSet(&frontierNew);
 		Vertexset_Allreduce_Pure(&frontierNew, VERTEXSET_OR);
+		
 
 		//swap Vertexsets
 		temp = frontierNew;
 		frontierNew = frontierOld;
 		frontierOld = temp;
 
+		Vertexset_PrintSet(&frontierOld);
 		Vertexset_Clean(&frontierNew);
 	}
-	
 
+	// perform reduce over preds array
+	// MPI_Allreduce(MPI_IN_PLACE, pred, nglobalverts, MPI_INT64_T, MPI_MAX, MPI_COMM_WORLD);	
 
 	// deinit VertexSets
 	Vertexset_Deinit(&visited);
