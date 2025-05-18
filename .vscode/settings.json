@@ -1,0 +1,16 @@
+{
+    "files.associations": {
+        "array": "c",
+        "deque": "c",
+        "string": "c",
+        "vector": "c",
+        "iterator": "c",
+        "string_view": "c",
+        "initializer_list": "c",
+        "unordered_map": "c",
+        "common.h": "c",
+        "csr_reference.h": "c",
+        "inttypes.h": "c",
+        "bitmap_custom.h": "c"
+    }
+}
