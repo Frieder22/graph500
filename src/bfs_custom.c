@@ -37,6 +37,10 @@ void make_graph_data_structure(const tuple_graph* const tg) {
 //prior to calling run_bfs pred is set to -1 by calling clean_pred
 void run_bfs(int64_t root, int64_t* pred) {
 	pred_glob=pred;
+	if (VERTEX_OWNER(root) == rank) {
+		pred[VERTEX_LOCAL(root)] = root;
+	}
+	
 	//user code to do bfs
 }
 
