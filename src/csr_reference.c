@@ -26,11 +26,11 @@ int64_t nverts_known = 0;
 int *degrees;
 int64_t *column;
 float *weights;
-extern oned_csr_graph g_old; //from bfs_reference for isisolated function
+extern oned_csr_graph g; //from bfs_reference for isisolated function
 
 //this function is needed for roots generation
 int isisolated(int64_t v) {
-	if(my_pe()==VERTEX_OWNER(v)) return (g_old.rowstarts[VERTEX_LOCAL(v)]==g_old.rowstarts[VERTEX_LOCAL(v)+1]);
+	if(my_pe()==VERTEX_OWNER(v)) return (g.rowstarts[VERTEX_LOCAL(v)]==g.rowstarts[VERTEX_LOCAL(v)+1]);
 	return 0; //locally no evidence, allreduce required
 }
 
@@ -72,8 +72,8 @@ void send_full_edge (int64_t src,int64_t tgt) {
 }
 #endif
 
-void convert_graph_to_oned_csr(const tuple_graph* const tg, oned_csr_graph* const g_old) {
-	g_old->tg = tg;
+void convert_graph_to_oned_csr(const tuple_graph* const tg, oned_csr_graph* const g) {
+	g->tg = tg;
 
 	size_t i,j,k;
 
@@ -100,15 +100,15 @@ void convert_graph_to_oned_csr(const tuple_graph* const tg, oned_csr_graph* cons
 	int64_t nglobalverts = 0;
 	aml_long_allmax(&nverts_known);
 	nglobalverts=nverts_known+1;
-	g_old->nglobalverts = nglobalverts;
+	g->nglobalverts = nglobalverts;
 	size_t nlocalverts = VERTEX_LOCAL(nglobalverts + num_pes() - 1 - my_pe());
-	g_old->nlocalverts = nlocalverts;
+	g->nlocalverts = nlocalverts;
 
 	//graph stats printing
 #ifdef DEBUGSTATS
 	long maxdeg=0,isolated=0,totaledges=0,originaledges;
 	long maxlocaledges,minlocaledges;
-	for(i=0;i<g_old->nlocalverts;i++) {
+	for(i=0;i<g->nlocalverts;i++) {
 		long deg = degrees[i];
 		totaledges+=deg;
 		if(maxdeg<deg) maxdeg=deg;
@@ -125,14 +125,14 @@ void convert_graph_to_oned_csr(const tuple_graph* const tg, oned_csr_graph* cons
 	long averageedges = totaledges/num_pes();
 	double disbalance = (double)(maxlocaledges-minlocaledges)/(double)averageedges * 100.0;
 	if(!my_pe()) printf("\n maxdeg %lld verts %lld, isolated %lld edges %lld\n\t A max %ld min %ld ave %ld delta %ld percent %3.2f\n ",
-			maxdeg,g_old->nglobalverts,isolated,totaledges,maxlocaledges,minlocaledges,averageedges,maxlocaledges-minlocaledges,disbalance);
+			maxdeg,g->nglobalverts,isolated,totaledges,maxlocaledges,minlocaledges,averageedges,maxlocaledges-minlocaledges,disbalance);
 
 	// finished stats printing
 
-	g_old->notisolated=g_old->nglobalverts-isolated;
+	g->notisolated=g->nglobalverts-isolated;
 #endif
 	unsigned int *rowstarts = xmalloc((nlocalverts + 1) * sizeof(int));
-	g_old->rowstarts = rowstarts;
+	g->rowstarts = rowstarts;
 
 	rowstarts[0] = 0;
 	for (i = 0; i < nlocalverts; ++i) {
@@ -141,7 +141,7 @@ void convert_graph_to_oned_csr(const tuple_graph* const tg, oned_csr_graph* cons
 	}
 
 	size_t nlocaledges = rowstarts[nlocalverts];
-	g_old->nlocaledges = nlocaledges;
+	g->nlocaledges = nlocaledges;
 
 	int64_t colalloc = BYTES_PER_VERTEX*nlocaledges;
 	colalloc += (4095);
@@ -151,11 +151,11 @@ void convert_graph_to_oned_csr(const tuple_graph* const tg, oned_csr_graph* cons
 	aml_barrier();
 #ifdef SSSP
 	weights = xmalloc(4*nlocaledges);
-	g_old->weights = weights;
+	g->weights = weights;
 	aml_barrier();
 #endif
 	//long allocatededges=colalloc;
-	g_old->column = column;
+	g->column = column;
 
 	aml_register_handler(fulledgehndl,1);
 	//Next pass , actual data transfer: placing edges to its places in column and hcolumn
@@ -179,10 +179,10 @@ void convert_graph_to_oned_csr(const tuple_graph* const tg, oned_csr_graph* cons
 	free(degrees);
 }
 
-void free_oned_csr_graph(oned_csr_graph* const g_old) {
-	if (g_old->rowstarts != NULL) {free(g_old->rowstarts); g_old->rowstarts = NULL;}
-	if (g_old->column != NULL) {free(g_old->column); g_old->column = NULL;}
+void free_oned_csr_graph(oned_csr_graph* const g) {
+	if (g->rowstarts != NULL) {free(g->rowstarts); g->rowstarts = NULL;}
+	if (g->column != NULL) {free(g->column); g->column = NULL;}
 #ifdef SSSP
-	if (g_old->weights != NULL) {free(g_old->weights); g_old->weights = NULL;}
+	if (g->weights != NULL) {free(g->weights); g->weights = NULL;}
 #endif
 }
