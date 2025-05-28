@@ -36,33 +36,24 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    int n = 3; // number of elements each rank should hold
-    int len = n*size;
-    int arr[n*size];
-    int arrOUT[n*size];
+    int *buff;
 
-    memset(arr, 0, sizeof(int)*len);
-    memset(arrOUT, 0, sizeof(int)*len);
+    if (rank == 0) {
+        int n = 10;
+        buff = (int*) malloc(n * sizeof(int));
 
-    for (int i = rank*n; i < n*(rank+1); i++) {
-        arr[i] = i;
+        MPI_Send(buff, n, MPI_INT, 1, 100, MPI_COMM_WORLD);
     }
 
-    arr[1] = rank;
-
-    printArr(arr, len);
-
-    MPI_Op someOR;
-    MPI_Op_create(predReduce, true, &someOR);
-
-    MPI_Reduce(arr, arrOUT, len, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
-    if (rank == 0) {
-        printf("\n");
-        printArr(arrOUT, len);
+    if (rank==1) {    
+        MPI_Status status;
+        int count;
+        MPI_Probe(0, 100, MPI_COMM_WORLD, &status);
+        MPI_Get_count(&status, MPI_INT, &count);
+        
+        printf("Count: %d", count);
     }
     
-
-
 
     MPI_Finalize();
     return 0;
