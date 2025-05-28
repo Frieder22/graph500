@@ -210,6 +210,20 @@ void Vertexset_Allreduce_Pure(Vertexset* vs, int VERTEXSET_OPERATION){
     assert(vs->sizeSparse >= 0);
 };
 
+void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
+    assert(VERTEXSET_OPERATION == VERTEXSET_OR); // no other operator implemented
+
+    // find block indices
+    int blockIdx[vs->maxsize + 1];
+    blockIdx[0] = 0;
+    for (int i = 1; i < vs->mpi_size + 1; i++) {
+        blockIdx[i] = vs->size_bitarray * i / vs->mpi_size;
+    }
+    
+    
+
+
+};
 void Vertexset_Allreduce_Approximate_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
     assert(VERTEXSET_OPERATION == VERTEXSET_OR); //no other version is implemented
 

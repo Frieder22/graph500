@@ -112,6 +112,18 @@ void Vertexset_Allreduce_Pure(Vertexset* vs, int VERTEXSET_OPERATION);
 /**
  * Performs an Allreduce operation with vertex sets from
  * other ranks. Each rank can have a different representation of 
+ * VertexSet. The size of the communicator musst be some 2^k.
+ * Time complexities:
+ * Dense: O(Allreduce(n))
+ * Sparse: O(Allgather(k))
+ * @param vs corresponding Vertexset object 
+ * @param VERTEXSET_OPERATION which logical operation should be applied
+ */
+void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION);
+
+/**
+ * Performs an Allreduce operation with vertex sets from
+ * other ranks. Each rank can have a different representation of 
  * VertexSet.
  * Time complexities:
  * Dense: O(Allreduce(n))
