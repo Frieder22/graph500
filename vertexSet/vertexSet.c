@@ -229,41 +229,41 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* vs, int VERTEXSET_OPERAT
     MPI_Allgather(&size_int, 1, MPI_INT, vs->sizesAll, 1, MPI_INT, vs->MPI_COMM);
 
     // calculate start and end of each block
-    int blockIndices_buffer[vs->mpi_size + 1];
     int blockIndices_input[vs->mpi_size + 1];
-    int block_nElements_buffer[vs->mpi_size];
+    int blockIndices_buffer[vs->mpi_size + 1];
     int block_nElements_input[vs->mpi_size];
+    int block_nElements_buffer[vs->mpi_size];
     
-    // calculate indices for input buffer (same for every thread)
+    // calculate indices for input (same for every thread)
     blockIndices_input[0] = 0;
     for (size_t i = 1; i < vs->mpi_size + 1; i++) {
         blockIndices_input[i] = vs->size_bitarray * i / vs->mpi_size;
         block_nElements_input[i-1] = blockIndices_input[i] - blockIndices_input[i-1];
     }
 
-    // calculate
-    
-
-
-
+    // calculate indices for R buffer
+    blockIndices_buffer[0] = 0;
+    for (size_t i = 1; i < vs->mpi_size + 1; i++) {
+        blockIndices_buffer[i] = blockIndices_buffer[i - 1] + block_nElements_input[(i - 1 + vs->mpi_rank) % vs->mpi_size ];
+        block_nElements_buffer[i-1] = blockIndices_buffer[i] - blockIndices_buffer[i-1];
+    }
     
     // filling shifted dense buffer
     if (vs->isdense) {
         int block_other;
         // copy shifted blocks
         for (int block = 0; block < vs->mpi_size; block++) {
-            block_other = (vs->mpi_rank + block) % vs->mpi_size
+            block_other = (vs->mpi_rank + block) % vs->mpi_size;
             // copy block
-            for (size_t i = 0; i < count; i++) {
-                /* code */
+            for (size_t i = 0; i < block_nElements_buffer[block]; i++) {
+                vs->bitBuffer[blockIndices_buffer[block] + i] = vs->bitArray[blockIndices_input[block_other] + i];                
             }
-            
-
         }
-        
-        
     }
     
+    // calculate number of iterations
+    
+
 
 
 };
