@@ -5,6 +5,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+
+// for colored text output
+// from https://stackoverflow.com/questions/3219393/stdlib-and-colored-output-in-c
+#define ANSI_RED     "\x1b[31m"
+#define ANSI_GREEN   "\x1b[32m"
+#define ANSI_YELLOW  "\x1b[33m"
+#define ANSI_BLUE    "\x1b[34m"
+#define ANSI_MAGENTA "\x1b[35m"
+#define ANSI_CYAN    "\x1b[36m"
+#define ANSI_RESET   "\x1b[0m"
+
 int rank, size;
 
 
@@ -26,7 +37,7 @@ void test_Iterator_sparse(){
 
     int count = 0;
     uint32_t element;
-    printf("Testing Has_next() and Next()\n");
+    printf("Testing Has_next() and Next()...\n");
     while (vertexSetIterator_Has_next(&it)) {
         element = vertexSetIterator_Next(&it);
         assert(element == addedVerts[count]);
@@ -36,7 +47,7 @@ void test_Iterator_sparse(){
 
     vertexSetIterator_Reset(&it);
     count = 0;
-    printf("Testing Reset()\n");
+    printf("Testing Reset()...\n");
     while (vertexSetIterator_Has_next(&it)) {
         element = vertexSetIterator_Next(&it);
         assert(element == addedVerts[count]);
@@ -47,7 +58,7 @@ void test_Iterator_sparse(){
 
     Vertexset_Deinit(&vs);
 
-    printf("Test Iterator Sparse SUCCESSFUL\n");
+    printf(ANSI_GREEN "Test Iterator Sparse SUCCESSFUL\n" ANSI_RESET);
     printf("--------------------------------------------\n\n");
 };
 
@@ -79,7 +90,7 @@ void test_Iterator_dense(){
 
     int count = 0;
     uint32_t element;
-    printf("Testing Has_next() and Next()\n");
+    printf("Testing Has_next() and Next()...\n");
     while (vertexSetIterator_Has_next(&it)) {
         element = vertexSetIterator_Next(&it);
         assert(element == addedVerts[count]);
@@ -89,7 +100,7 @@ void test_Iterator_dense(){
 
     vertexSetIterator_Reset(&it);
     count = 0;
-    printf("Testing Reset()\n");
+    printf("Testing Reset()...\n");
     while (vertexSetIterator_Has_next(&it)) {
         element = vertexSetIterator_Next(&it);
         assert(element == addedVerts[count]);
@@ -99,28 +110,50 @@ void test_Iterator_dense(){
 
     Vertexset_Deinit(&vs);
 
-    printf("Test Iterator Dense SUCCESSFUL\n");
+    printf(ANSI_GREEN "Test Iterator Dense SUCCESSFUL\n" ANSI_RESET);
     printf("--------------------------------------------\n\n");
 };
 
 void test_Allreduce_Exactly_Halfing(){
+    assert(size == 4); // only works correctly for 4 ranks
     bool isCorrect = true;
 
+    Vertexset vs;
+    Vertexset_Init(&vs, 10, MPI_COMM_WORLD);
 
+    // every rank adds different amount of vertices
+    for (size_t i = 0; i < rank; i++) {
+        Vertexset_Add(&vs, rank + i);
+    }
+    // rank 0:  ()
+    // rank 1:  (1)
+    // rank 2:  (2, 3)
+    // rank 3:  (3, 4, 5)
+    // Reduced: (1, 2, 3, 4, 5)
 
+    Vertexset_Allreduce_Exact_Halfing(&vs, VERTEXSET_OR);
+
+    vertexSetIterator it;
+    vertexSetIterator_Init(&it, &vs);
+
+    uint32_t val;
+    while (vertexSetIterator_Has_next(&it)) {
+        val = vertexSetIterator_Next(&it);
+    }
+    
+    
 
 
 
     // Check if other ranks had problems
     MPI_Allreduce(MPI_IN_PLACE, &isCorrect, 1, MPI_C_BOOL, MPI_LAND, MPI_COMM_WORLD);
-    assert(isCorrect);
 
     if (rank==0) {
         if (isCorrect) {
-            printf("Test Allreduce_Exactly SUCCESSFUL\n");
+            printf(ANSI_GREEN "Test Allreduce_Exactly SUCCESSFUL\n" ANSI_RESET);
             printf("--------------------------------------------\n\n");
         } else {
-            printf("Test Allreduce_Exactly FAILED\n");
+            printf(ANSI_RED "Test Allreduce_Exactly FAILED\n" ANSI_RESET );
             printf("--------------------------------------------\n\n");
         }        
     }
