@@ -210,6 +210,63 @@ void Vertexset_Allreduce_Pure(Vertexset* vs, int VERTEXSET_OPERATION){
     assert(vs->sizeSparse >= 0);
 };
 
+void Vertexset_Allreduce_Approximate_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
+    assert(VERTEXSET_OPERATION == VERTEXSET_OR); //no other version is implemented
+
+    int maxSparseSize = vs->sizeCrit;
+    // transform into dense, if critical size is hit
+    if (vs->sizeSparse >= maxSparseSize) {
+        Vertexset_TransformToDense(vs);
+    }
+
+    // set size to maximum, if dense
+    if (vs->isdense) {
+        vs->sizeSparse = maxSparseSize;
+    }
+    
+    // Find the sizes of other ranks
+    int size_int = (int) vs->sizeSparse;
+    MPI_Allgather(&size_int, 1, MPI_INT, vs->sizesAll, 1, MPI_INT, vs->MPI_COMM);
+
+    // calculate start and end of each block
+    int blockIndices_buffer[vs->mpi_size + 1];
+    int blockIndices_input[vs->mpi_size + 1];
+    int block_nElements_buffer[vs->mpi_size];
+    int block_nElements_input[vs->mpi_size];
+    
+    // calculate indices for input buffer (same for every thread)
+    blockIndices_input[0] = 0;
+    for (size_t i = 1; i < vs->mpi_size + 1; i++) {
+        blockIndices_input[i] = vs->size_bitarray * i / vs->mpi_size;
+        block_nElements_input[i-1] = blockIndices_input[i] - blockIndices_input[i-1];
+    }
+
+    // calculate
+    
+
+
+
+    
+    // filling shifted dense buffer
+    if (vs->isdense) {
+        int block_other;
+        // copy shifted blocks
+        for (int block = 0; block < vs->mpi_size; block++) {
+            block_other = (vs->mpi_rank + block) % vs->mpi_size
+            // copy block
+            for (size_t i = 0; i < count; i++) {
+                /* code */
+            }
+            
+
+        }
+        
+        
+    }
+    
+
+
+};
 
 void Vertexset_Allreduce_Dynamic(Vertexset* vs, int VERTEXSET_OPERATION){
     // Check if OR operation is used (other is not implemented yet)
