@@ -5,6 +5,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+int rank, size;
+
+
 void test_Iterator_sparse(){
     printf("Testing Iterator sparse...\n");
     Vertexset vs;
@@ -100,18 +103,47 @@ void test_Iterator_dense(){
     printf("--------------------------------------------\n\n");
 };
 
+void test_Allreduce_Exactly_Halfing(){
+    bool isCorrect = true;
+
+
+
+
+
+
+    // Check if other ranks had problems
+    MPI_Allreduce(MPI_IN_PLACE, &isCorrect, 1, MPI_C_BOOL, MPI_LAND, MPI_COMM_WORLD);
+    assert(isCorrect);
+
+    if (rank==0) {
+        if (isCorrect) {
+            printf("Test Allreduce_Exactly SUCCESSFUL\n");
+            printf("--------------------------------------------\n\n");
+        } else {
+            printf("Test Allreduce_Exactly FAILED\n");
+            printf("--------------------------------------------\n\n");
+        }        
+    }
+}
 
 
 int main(int argc, char *argv[]){
-    int rank, size;
     MPI_Init(&argc, &argv);
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
+    assert(argc == 2);
+    int testNumber = atoi(argv[1]);
+    
+    if (testNumber == 0){
+        test_Iterator_dense();
+        test_Iterator_sparse();
+    }
 
-    test_Iterator_sparse();
-    test_Iterator_dense();
+    if (testNumber == 1){
+        test_Allreduce_Exactly_Halfing();
+    }
 
     MPI_Finalize();
     return 0;

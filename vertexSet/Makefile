@@ -17,8 +17,10 @@ run: main
 	mpirun -np 4 $(build)/$(target).o
 
 test_it: test
-	mpirun -np 1 ./$(build)/test.o
+	mpirun -np 1 ./$(build)/test.o 0
 
+test_reduce: test
+	mpirun -np 4 ./$(build)/test.o 1
 
 clean:
 	rm -rf build
