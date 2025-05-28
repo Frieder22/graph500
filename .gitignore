@@ -2,3 +2,4 @@
 src/graph500_*
 .vscode/*
 /build/*
+*.o
