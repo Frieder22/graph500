@@ -131,19 +131,51 @@ void test_Allreduce_Exactly_Halfing(){
     // rank 3:  (3, 4, 5)
     // Reduced: (1, 2, 3, 4, 5)
 
+    uint32_t reducedReference[] = {1,2,3,4,5};
+    const int referenceSize = sizeof(reducedReference)/sizeof(uint32_t);
+
     Vertexset_Allreduce_Exact_Halfing(&vs, VERTEXSET_OR);
 
     vertexSetIterator it;
     vertexSetIterator_Init(&it, &vs);
 
+    // Check if vertex set is subset of reference set
     uint32_t val;
+    bool isInSet;
     while (vertexSetIterator_Has_next(&it)) {
         val = vertexSetIterator_Next(&it);
+        isInSet = false;
+        for (size_t i = 0; i < referenceSize; i++) {
+            if (val == reducedReference[i]) {
+                isInSet = true;
+                break;
+            }            
+        }
+        if (!isInSet) { // value can not be found in reference
+            isCorrect = false;
+            break;
+        } 
+    }
+
+    // check if reference set is subset of vertexset
+    uint32_t valRef;
+    vertexSetIterator_Reset(&it);
+    for (size_t i = 0; i < referenceSize; i++) {
+        valRef = reducedReference[i];
+        isInSet = false;
+        while (vertexSetIterator_Has_next(&it)) {
+            val = vertexSetIterator_Next(&it);
+            if(val == valRef){
+                isInSet = true;
+                break;
+            }
+        }
+        if (!isInSet) { // value can not be found in reference
+            isCorrect = false;
+            break;
+        } 
     }
     
-    
-
-
 
     // Check if other ranks had problems
     MPI_Allreduce(MPI_IN_PLACE, &isCorrect, 1, MPI_C_BOOL, MPI_LAND, MPI_COMM_WORLD);
