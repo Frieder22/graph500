@@ -63,7 +63,7 @@ void Vertexset_Init(Vertexset* vs, uint32_t maxsize, MPI_Comm MPI_COMM){
     vs->maxsize = maxsize;
     
     // init bitArray
-    size_t size_bitarray = (maxsize + 1) / sizeof(unsigned long long);
+    size_t size_bitarray = (maxsize + (sizeof(unsigned long long)*8)) / (sizeof(unsigned long long)*8);
     vs->size_bitarray = size_bitarray;
     vs->bitArray = (unsigned long long*) malloc(size_bitarray * sizeof(unsigned long long));
     vs->bitBuffer = (unsigned long long*) malloc(size_bitarray * sizeof(unsigned long long));
