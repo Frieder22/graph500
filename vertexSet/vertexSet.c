@@ -223,6 +223,7 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
         blockIdx[i] = vs->size_bitarray * i / vs->mpi_size;
     }
     
+    
     // try only in dense variant firstly:
     Vertexset_TransformToDense(vs);
 
@@ -237,13 +238,13 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
     for (int shift = vs->mpi_size / 2 ; shift >= 1; shift/=2) {
         // do bitflip with LOR to find neighbot
         commNeighbor = vs->mpi_rank ^ shift;
-        
-        // find start indices of send
-        startBlock = (vs->mpi_rank/shift) * shift;
-        startIndex = blockIdx[startBlock];
-        nElements = blockIdx[startBlock+1] - startIndex;
 
-        MPI_Send(vs->bitArray[startIndex], nElements, MPI_UNSIGNED_LONG_LONG, commNeighbor, 100, vs->MPI_COMM);
+        // find start indices of send
+        startBlock = (commNeighbor/shift) * shift;
+        startIndex = blockIdx[startBlock];
+        nElements = blockIdx[startBlock + shift] - startIndex;
+
+        MPI_Send(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, commNeighbor, 100, vs->MPI_COMM);
 
         // Check, if recieved message is in dense format
         MPI_Probe(commNeighbor, 100, vs->MPI_COMM, &status);
@@ -252,11 +253,43 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
         // Recieve into buffer
         MPI_Recv(vs->bitBuffer, recvCount, MPI_LONG_LONG, commNeighbor, 100, vs->MPI_COMM, MPI_STATUS_IGNORE);
 
-        
+        // do reduction
+        startBlock = (vs->mpi_rank/shift) * shift;
+        startIndex = blockIdx[startBlock];
+        assert(recvCount == blockIdx[startBlock + shift]-startIndex);
+        for (int i = startIndex; i < blockIdx[startBlock + shift]; i++) {
+            vs->bitArray[i] |= vs->bitBuffer[i-startIndex];
+        }       
     }
     
-    
+    // do allGather
+    for (int shift = 1; shift < vs->mpi_size; shift*=2)  {
+        // do bitflip with LOR to find neighbor
+        commNeighbor = vs->mpi_rank ^ shift;
 
+        // find start indices of send
+        startBlock = (vs->mpi_rank/shift) * shift;
+        startIndex = blockIdx[startBlock];
+        nElements = blockIdx[startBlock + shift] - startIndex;
+        
+        MPI_Send(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, commNeighbor, 101, vs->MPI_COMM);
+
+        // Check, if recieved message is in dense format
+        MPI_Probe(commNeighbor, 101, vs->MPI_COMM, &status);
+        MPI_Get_count(&status, MPI_LONG_LONG, &recvCount);
+        
+        // Recieve into buffer
+        MPI_Recv(vs->bitBuffer, recvCount, MPI_LONG_LONG, commNeighbor, 101, vs->MPI_COMM, MPI_STATUS_IGNORE);
+        
+        // do fill in
+        startBlock = (commNeighbor/shift) * shift;
+        startIndex = blockIdx[startBlock];
+        assert(recvCount == blockIdx[startBlock + shift]-startIndex);
+        for (int i = startIndex; i < blockIdx[startBlock + shift]; i++) {
+            vs->bitArray[i] = vs->bitBuffer[i-startIndex];
+        }  
+    }
+    
 
 };
 void Vertexset_Allreduce_Approximate_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
