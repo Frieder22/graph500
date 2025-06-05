@@ -1,5 +1,5 @@
 GCC = mpicc
-CFLAGS = -O3 -I/.
+CFLAGS = -O3 -I.
 
 target = main
 SOURCES = vertexSet.c vertexSetIterator.c
