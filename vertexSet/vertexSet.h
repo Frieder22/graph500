@@ -16,10 +16,10 @@ typedef struct Vertexset{
     // Data for Bitarray
     unsigned long long *bitArray;
     unsigned long long *bitBuffer;
-    uint32_t size_bitarray;
+    int size_bitarray;
     
     // Data for sparse array
-    size_t sizeSparse;
+    int sizeSparse;
     uint32_t *sparseArray;
     uint32_t *sparseBuffer;
     int *sizesAll;
