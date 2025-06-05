@@ -213,7 +213,7 @@ void Vertexset_Allreduce_Pure(Vertexset* vs, int VERTEXSET_OPERATION){
 
 void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
     assert(VERTEXSET_OPERATION == VERTEXSET_OR); // no other operator implemented
-    assert((vs->mpi_size & (vs->mpi_size - 1)) == 0); // communicator must be size of 2
+    assert((vs->mpi_size & (vs->mpi_size - 1)) == 0); // communicator must be size of 2^k
     
     // find ciritical size
     size_t criticalSize = vs->sizeCrit;
@@ -293,14 +293,15 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
         }
         
         
-        // Check, if recieved message is in dense format
+        // get info, if recieved message is in dense or sparse format
         MPI_Probe(commNeighbor, MPI_ANY_TAG, vs->MPI_COMM, &status);
         tag = status.MPI_TAG;
-        MPI_Get_count(&status, MPI_LONG_LONG, &recvCount);
-        
         
         if (tag==100) {
             // sparse array is recieved
+            // get length of message
+            MPI_Get_count(&status, MPI_INT32_T, &recvCount);
+
             MPI_Recv(vs->sparseBuffer, recvCount, MPI_INT32_T, commNeighbor, 100, vs->MPI_COMM, MPI_STATUS_IGNORE);
 
             int count=vs->sizeSparse;
@@ -325,6 +326,9 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
 
         } else if (tag==200) {
             // dense array is recieved          
+            // get length of message
+            MPI_Get_count(&status, MPI_UNSIGNED_LONG_LONG, &recvCount);
+            
             // Recieve into buffer
             MPI_Recv(vs->bitBuffer, recvCount, MPI_UNSIGNED_LONG_LONG, commNeighbor, 200, vs->MPI_COMM, MPI_STATUS_IGNORE);
 
@@ -341,10 +345,7 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
             
         } else {
             assert("recieved wrong tag" && false);
-        }
-        
-        
-      
+        }      
     }
     
     // In case only sparse communication was performed, we don't need allgather
