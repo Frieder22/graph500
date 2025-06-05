@@ -212,10 +212,35 @@ void Vertexset_Allreduce_Pure(Vertexset* vs, int VERTEXSET_OPERATION){
 
 void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
     assert(VERTEXSET_OPERATION == VERTEXSET_OR); // no other operator implemented
-
     assert((vs->mpi_size & (vs->mpi_size - 1)) == 0); // communicator must be size of 2
+    
+    // find ciritical size
+    size_t criticalSize = vs->sizeCrit;
 
+    // prepare, if vertexset is sparse or few elements are added
+    if (!(vs->isdense) || vs->sizeSparse < criticalSize/2) {
+        Bitmap_Clean(vs->bitArray, vs->size_bitarray);
+        int count=0;
+        int32_t vert;
+        for (size_t i = 0; i < vs->sizeSparse; i++) {
+            vert = vs->sparseArray[i];
+            if (!(Bitmap_Test(vs->bitArray,vert))) {
+                // add to correct sparse list, while avoiding dublicates
+                vs->sparseBuffer[count++];
+            }
+            Bitmap_Set(vs->bitArray, vert);
+        }
+        // set correctly counted size
+        vs->sizeSparse = count;
 
+        // switching pointer to original
+        uint32_t *temp;
+        temp = vs->sparseArray;
+        vs->sparseArray = vs->sparseBuffer;
+        vs->sparseBuffer = temp;
+        temp = NULL;        
+    }
+    
     // find block indices
     int blockIdx[vs->maxsize + 1];
     blockIdx[0] = 0;
@@ -223,18 +248,14 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
         blockIdx[i] = vs->size_bitarray * i / vs->mpi_size;
     }
     
-    
-    // try only in dense variant firstly:
-    Vertexset_TransformToDense(vs);
-
-
+    // do reduce_scatter
     int commNeighbor;
     int startBlock;
     int startIndex;
     int nElements;
+    int tag;
     MPI_Status status;
     int recvCount;
-    // do reduce_scatter
     for (int shift = vs->mpi_size / 2 ; shift >= 1; shift/=2) {
         // do bitflip with LOR to find neighbot
         commNeighbor = vs->mpi_rank ^ shift;
@@ -244,14 +265,25 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
         startIndex = blockIdx[startBlock];
         nElements = blockIdx[startBlock + shift] - startIndex;
 
-        MPI_Send(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, commNeighbor, 100, vs->MPI_COMM);
+        // decide, which strategy to choose from
+        criticalSize /= 2;
+        if (false) {
+            // send sparse array
+            MPI_Send(vs->sparseArray, vs->sizeSparse, MPI_INT32_T, commNeighbor, 100, vs->MPI_COMM);
+        } else {
+            // send dense array
+            MPI_Send(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, commNeighbor, 200, vs->MPI_COMM);
+        }
+        
 
         // Check, if recieved message is in dense format
-        MPI_Probe(commNeighbor, 100, vs->MPI_COMM, &status);
+        MPI_Probe(commNeighbor, 200, vs->MPI_COMM, &status);
+        tag = status.MPI_TAG;
         MPI_Get_count(&status, MPI_LONG_LONG, &recvCount);
+
         
         // Recieve into buffer
-        MPI_Recv(vs->bitBuffer, recvCount, MPI_LONG_LONG, commNeighbor, 100, vs->MPI_COMM, MPI_STATUS_IGNORE);
+        MPI_Recv(vs->bitBuffer, recvCount, MPI_LONG_LONG, commNeighbor, 200, vs->MPI_COMM, MPI_STATUS_IGNORE);
 
         // do reduction
         startBlock = (vs->mpi_rank/shift) * shift;
