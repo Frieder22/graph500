@@ -80,7 +80,6 @@ void test_Iterator_dense(){
     }
 
     Vertexset_TransformToDense(&vs);
-
     vertexSetIterator it;
     vertexSetIterator_Init(&it, &vs);
 
@@ -115,66 +114,58 @@ void test_Iterator_dense(){
 };
 
 void test_Allreduce_Exactly_Halfing(){
-    assert(size == 4); // only works correctly for 4 ranks
+    assert((size & (size - 1)) == 0); // only works for ranks = 2^k
     bool isCorrect = true;
 
-    Vertexset vs;
-    Vertexset_Init(&vs, 10, MPI_COMM_WORLD);
+    int setSize = 10000;
+    int insertions = 654;
 
-    // every rank adds different amount of vertices
-    for (size_t i = 0; i < rank; i++) {
-        Vertexset_Add(&vs, rank + i);
+    Vertexset vs, control;
+    Vertexset_Init(&vs, setSize, MPI_COMM_WORLD);
+    Vertexset_Init(&control, setSize, MPI_COMM_WORLD);
+    
+    Vertexset_TransformToDense(&control);
+    
+    // all ranks have same seed
+    srand(2);
+    int num;
+    for (size_t i = 0; i < insertions; i++) {
+        num = rand()%setSize;
+        Vertexset_Add(&control, num);
+        if (i%size==rank) {
+            Vertexset_Add(&vs, num);
+        }
     }
-    // rank 0:  ()
-    // rank 1:  (1)
-    // rank 2:  (2, 3)
-    // rank 3:  (3, 4, 5)
-    // Reduced: (1, 2, 3, 4, 5)
-
-    uint32_t reducedReference[] = {1,2,3,4,5};
-    const int referenceSize = sizeof(reducedReference)/sizeof(uint32_t);
-
+    
+    // perform allreduce
     Vertexset_Allreduce_Exact_Halfing(&vs, VERTEXSET_OR);
 
-    vertexSetIterator it;
+    vertexSetIterator it, it_control;
     vertexSetIterator_Init(&it, &vs);
+    vertexSetIterator_Init(&it_control, &control);
 
     // Check if vertex set is subset of reference set
-    uint32_t val;
-    bool isInSet;
+    int32_t val;
     while (vertexSetIterator_Has_next(&it)) {
         val = vertexSetIterator_Next(&it);
-        isInSet = false;
-        for (size_t i = 0; i < referenceSize; i++) {
-            if (val == reducedReference[i]) {
-                isInSet = true;
-                break;
-            }            
-        }
-        if (!isInSet) { // value can not be found in reference
+
+        if (!Vertexset_Contains(&control, val)) { // value can not be found in reference
             isCorrect = false;
             break;
         } 
     }
 
     // check if reference set is subset of vertexset
-    uint32_t valRef;
-    vertexSetIterator_Reset(&it);
-    for (size_t i = 0; i < referenceSize; i++) {
-        valRef = reducedReference[i];
-        isInSet = false;
-        while (vertexSetIterator_Has_next(&it)) {
-            val = vertexSetIterator_Next(&it);
-            if(val == valRef){
-                isInSet = true;
-                break;
-            }
-        }
-        if (!isInSet) { // value can not be found in reference
+    while (vertexSetIterator_Has_next(&it_control)) {
+        val = vertexSetIterator_Next(&it_control);
+
+        if (!Vertexset_Contains(&vs, val)) { // value can not be found in reference
             isCorrect = false;
             break;
         } 
     }
+    
+ 
     
 
     // Check if other ranks had problems
@@ -182,10 +173,10 @@ void test_Allreduce_Exactly_Halfing(){
 
     if (rank==0) {
         if (isCorrect) {
-            printf(ANSI_GREEN "Test Allreduce_Exactly SUCCESSFUL\n" ANSI_RESET);
+            printf(ANSI_GREEN "Test Allreduce_Exactly_Halfing SUCCESSFUL\n" ANSI_RESET);
             printf("--------------------------------------------\n\n");
         } else {
-            printf(ANSI_RED "Test Allreduce_Exactly FAILED\n" ANSI_RESET );
+            printf(ANSI_RED "Test Allreduce_Exactly_Halfing FAILED\n" ANSI_RESET );
             printf("--------------------------------------------\n\n");
         }        
     }
@@ -201,11 +192,13 @@ int main(int argc, char *argv[]){
     assert(argc == 2);
     int testNumber = atoi(argv[1]);
     
+    // test_it: test iterators
     if (testNumber == 0){
         test_Iterator_dense();
         test_Iterator_sparse();
     }
 
+    // test_red: test reduce algorithms
     if (testNumber == 1){
         test_Allreduce_Exactly_Halfing();
     }
