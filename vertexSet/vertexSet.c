@@ -130,9 +130,10 @@ void Vertexset_Clean(Vertexset* vs) {
 bool Vertexset_TransformToDense(Vertexset* vs) {
     // only do, if it's sparse
     if (!vs->isdense){
+        uint32_t vertex;
         Bitmap_Clean(vs->bitArray, vs->size_bitarray);
         for (size_t i = 0; i < vs->sizeSparse; i++){
-            uint32_t vertex = vs->sparseArray[i];
+            vertex = vs->sparseArray[i];
             Bitmap_Set(vs->bitArray, vertex);
         }
         vs->isdense = true;
@@ -218,29 +219,45 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
     size_t criticalSize = vs->sizeCrit;
 
     // prepare, if vertexset is sparse or few elements are added
-    if (!(vs->isdense) || vs->sizeSparse < criticalSize/2) {
+    if (!(vs->isdense)) {
         Bitmap_Clean(vs->bitArray, vs->size_bitarray);
         int count=0;
         int32_t vert;
         for (size_t i = 0; i < vs->sizeSparse; i++) {
             vert = vs->sparseArray[i];
-            if (!(Bitmap_Test(vs->bitArray,vert))) {
-                // add to correct sparse list, while avoiding dublicates
-                vs->sparseBuffer[count++];
+            if (count <= criticalSize/2){
+                // add to sparse list and update bitarray
+                if (!(Bitmap_Test(vs->bitArray, vert))) {
+                    // add to correct sparse list, while avoiding dublicates
+                    vs->sparseBuffer[count++] = vert;
+                    Bitmap_Set(vs->bitArray, vert);
+                }
+            } else {
+                // update bitarray (without caring about sparse)
+                Bitmap_Set(vs->bitArray, vert);
             }
-            Bitmap_Set(vs->bitArray, vert);
         }
         // set correctly counted size
         vs->sizeSparse = count;
-
+        
         // switching pointer to original
-        uint32_t *temp;
-        temp = vs->sparseArray;
-        vs->sparseArray = vs->sparseBuffer;
-        vs->sparseBuffer = temp;
-        temp = NULL;        
+        if (count< criticalSize/2) {
+            // only neccary, when sparse variant is needed   
+            uint32_t *temp;
+            temp = vs->sparseArray;
+            vs->sparseArray = vs->sparseBuffer;
+            vs->sparseBuffer = temp;
+            temp = NULL;        
+        }
     }
-    
+
+    // prepare vertexset, if it is dense
+    if (vs->isdense){
+        vs->sizeSparse = criticalSize + 1;
+    }
+
+
+
     // find block indices
     int blockIdx[vs->maxsize + 1];
     blockIdx[0] = 0;
@@ -257,43 +274,86 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
     MPI_Status status;
     int recvCount;
     for (int shift = vs->mpi_size / 2 ; shift >= 1; shift/=2) {
-        // do bitflip with LOR to find neighbot
+        // do bitflip with LOR to find neighbor
         commNeighbor = vs->mpi_rank ^ shift;
-
-        // find start indices of send
-        startBlock = (commNeighbor/shift) * shift;
-        startIndex = blockIdx[startBlock];
-        nElements = blockIdx[startBlock + shift] - startIndex;
 
         // decide, which strategy to choose from
         criticalSize /= 2;
-        if (false) {
+        if (vs->sizeSparse < criticalSize) {
             // send sparse array
             MPI_Send(vs->sparseArray, vs->sizeSparse, MPI_INT32_T, commNeighbor, 100, vs->MPI_COMM);
         } else {
+            // find start indices of send
+            startBlock = (commNeighbor/shift) * shift;
+            startIndex = blockIdx[startBlock];
+            nElements = blockIdx[startBlock + shift] - startIndex;
+
             // send dense array
             MPI_Send(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, commNeighbor, 200, vs->MPI_COMM);
         }
         
-
+        
         // Check, if recieved message is in dense format
-        MPI_Probe(commNeighbor, 200, vs->MPI_COMM, &status);
+        MPI_Probe(commNeighbor, MPI_ANY_TAG, vs->MPI_COMM, &status);
         tag = status.MPI_TAG;
         MPI_Get_count(&status, MPI_LONG_LONG, &recvCount);
-
         
-        // Recieve into buffer
-        MPI_Recv(vs->bitBuffer, recvCount, MPI_LONG_LONG, commNeighbor, 200, vs->MPI_COMM, MPI_STATUS_IGNORE);
+        
+        if (tag==100) {
+            // sparse array is recieved
+            MPI_Recv(vs->sparseBuffer, recvCount, MPI_INT32_T, commNeighbor, 100, vs->MPI_COMM, MPI_STATUS_IGNORE);
 
-        // do reduction
-        startBlock = (vs->mpi_rank/shift) * shift;
-        startIndex = blockIdx[startBlock];
-        assert(recvCount == blockIdx[startBlock + shift]-startIndex);
-        for (int i = startIndex; i < blockIdx[startBlock + shift]; i++) {
-            vs->bitArray[i] |= vs->bitBuffer[i-startIndex];
-        }       
+            int count=vs->sizeSparse;
+            int32_t vert;
+            // do reduction (append non dublicates and also update bitarray)
+            for (size_t i = 0; i < recvCount; i++)  {
+                vert = vs->sparseBuffer[i];
+                if (count <= criticalSize/2 || shift==1) {
+                    // set bitmap, and add to sparse,if needed
+                    if (!Bitmap_Test(vs->bitArray, vert)) {
+                        // save in sparse array until its needed in next round
+                        Bitmap_Set(vs->bitArray, vert);
+                        vs->sparseArray[count++] = vert;                        
+                    }
+                } else {
+                    Bitmap_Set(vs->bitArray, vert);
+                }
+            }
+
+            // set count
+            vs->sizeSparse = count;
+
+        } else if (tag==200) {
+            // dense array is recieved          
+            // Recieve into buffer
+            MPI_Recv(vs->bitBuffer, recvCount, MPI_UNSIGNED_LONG_LONG, commNeighbor, 200, vs->MPI_COMM, MPI_STATUS_IGNORE);
+
+            // do reduction
+            startBlock = (vs->mpi_rank/shift) * shift;
+            startIndex = blockIdx[startBlock];
+            assert(recvCount == blockIdx[startBlock + shift]-startIndex);
+            for (int i = startIndex; i < blockIdx[startBlock + shift]; i++) {
+                vs->bitArray[i] |= vs->bitBuffer[i-startIndex];
+            }
+            
+            // set count, that is over critical size
+            vs->sizeSparse = criticalSize + 1;
+            
+        } else {
+            assert("recieved wrong tag" && false);
+        }
+        
+        
+      
     }
     
+    // In case only sparse communication was performed, we don't need allgather
+    if (vs->sizeSparse <= criticalSize) {
+        vs->isdense = false;
+        return;
+    }
+    
+
     // do allGather
     for (int shift = 1; shift < vs->mpi_size; shift*=2)  {
         // do bitflip with LOR to find neighbor
@@ -321,6 +381,9 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
             vs->bitArray[i] = vs->bitBuffer[i-startIndex];
         }  
     }
+
+    // musst be dense, if allgather was needed
+    vs->isdense = true;
     
 
 };
