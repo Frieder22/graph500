@@ -113,8 +113,7 @@ void test_Iterator_dense(){
     printf("--------------------------------------------\n\n");
 };
 
-void test_Allreduce_Exactly_Halfing(){
-    assert((size & (size - 1)) == 0); // only works for ranks = 2^k
+void test_Allreduce(void (*reduceFunc) (Vertexset*, int)){
     bool isCorrect = true;
 
     int setSize = 10000;
@@ -138,7 +137,7 @@ void test_Allreduce_Exactly_Halfing(){
     }
     
     // perform allreduce
-    Vertexset_Allreduce_Exact_Halfing(&vs, VERTEXSET_OR);
+    (*reduceFunc) (&vs, VERTEXSET_OR);
 
     vertexSetIterator it, it_control;
     vertexSetIterator_Init(&it, &vs);
@@ -198,9 +197,15 @@ int main(int argc, char *argv[]){
         test_Iterator_sparse();
     }
 
-    // test_red: test reduce algorithms
+    // test_red_exactHalfing: test reduce 
     if (testNumber == 1){
-        test_Allreduce_Exactly_Halfing();
+        assert((size & (size - 1)) == 0); // only works for ranks = 2^k
+        test_Allreduce(Vertexset_Allreduce_Exact_Halfing);
+    }
+
+    // test_red_approxHalfing: test reduce 
+    if (testNumber == 2){
+        test_Allreduce(Vertexset_Allreduce_Approximate_Halfing);
     }
 
     MPI_Finalize();

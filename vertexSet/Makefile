@@ -19,8 +19,11 @@ run: main
 test_it: test
 	mpirun -np 1 ./$(build)/test.o 0
 
-test_reduce: test
+test_red_exactHalfing: test
 	mpirun -np 4 ./$(build)/test.o 1
+
+test_red_approxHalfing: test
+	mpirun -np 4 ./$(build)/test.o 2
 
 clean:
 	rm -rf build
