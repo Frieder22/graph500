@@ -218,7 +218,7 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
     // find ciritical size
     size_t criticalSize = vs->sizeCrit;
 
-    // prepare, if vertexset is sparse or few elements are added
+    // prepare, if vertexset is sparse
     if (!(vs->isdense)) {
         Bitmap_Clean(vs->bitArray, vs->size_bitarray);
         int count=0;
@@ -388,24 +388,22 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
     
 
 };
+
+
 void Vertexset_Allreduce_Approximate_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
     assert(VERTEXSET_OPERATION == VERTEXSET_OR); //no other version is implemented
 
-    int maxSparseSize = vs->sizeCrit;
+    int criticalSize = vs->sizeCrit;
     // transform into dense, if critical size is hit
-    if (vs->sizeSparse >= maxSparseSize) {
+    if (vs->sizeSparse >= criticalSize) {
         Vertexset_TransformToDense(vs);
     }
 
     // set size to maximum, if dense
     if (vs->isdense) {
-        vs->sizeSparse = maxSparseSize;
+        vs->sizeSparse = criticalSize + 1;
     }
     
-    // Find the sizes of other ranks
-    int size_int = (int) vs->sizeSparse;
-    MPI_Allgather(&size_int, 1, MPI_INT, vs->sizesAll, 1, MPI_INT, vs->MPI_COMM);
-
     // calculate start and end of each block
     int blockIndices_input[vs->mpi_size + 1];
     int blockIndices_buffer[vs->mpi_size + 1];
@@ -426,20 +424,78 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* vs, int VERTEXSET_OPERAT
         block_nElements_buffer[i-1] = blockIndices_buffer[i] - blockIndices_buffer[i-1];
     }
     
-    // filling shifted dense buffer
-    if (vs->isdense) {
-        int block_other;
-        // copy shifted blocks
-        for (int block = 0; block < vs->mpi_size; block++) {
-            block_other = (vs->mpi_rank + block) % vs->mpi_size;
-            // copy block
-            for (size_t i = 0; i < block_nElements_buffer[block]; i++) {
-                vs->bitBuffer[blockIndices_buffer[block] + i] = vs->bitArray[blockIndices_input[block_other] + i];                
+    // prepare, if vertexset is sparse
+    if (!(vs->isdense)) {
+        Bitmap_Clean(vs->bitArray, vs->size_bitarray);
+        int count=0;
+        int32_t vert;
+        for (size_t i = 0; i < vs->sizeSparse; i++) {
+            vert = vs->sparseArray[i];
+            if (count <= criticalSize/2){
+                // add to sparse list and update bitarray
+                if (!(Bitmap_Test(vs->bitArray, vert))) {
+                    // add to correct sparse list, while avoiding dublicates
+                    vs->sparseBuffer[count++] = vert;
+                    Bitmap_Set(vs->bitArray, vert);
+                }
+            } else {
+                // update bitarray (without caring about sparse)
+                Bitmap_Set(vs->bitArray, vert);
             }
+        }
+        // set correctly counted size
+        vs->sizeSparse = count;
+        
+        // switching pointer to original
+        if (count< criticalSize/2) {
+            // only neccary, when sparse variant is needed   
+            uint32_t *temp;
+            temp = vs->sparseArray;
+            vs->sparseArray = vs->sparseBuffer;
+            vs->sparseBuffer = temp;
+            temp = NULL;        
+        }
+    }
+
+    // filling shifted dense buffer
+    int block_other;
+    // copy shifted blocks
+    for (int block = 0; block < vs->mpi_size; block++) {
+        block_other = (vs->mpi_rank + block) % vs->mpi_size;
+        // copy block
+        for (size_t i = 0; i < block_nElements_buffer[block]; i++) {
+            vs->bitBuffer[blockIndices_buffer[block] + i] = vs->bitArray[blockIndices_input[block_other] + i];                
         }
     }
     
-    // calculate number of iterations
+    // set a correct bit in shifted array
+    int32_t vert = 5;
+    int32_t indexShift = blockIndices_input[vs->mpi_rank];
+    for (size_t i = 0; i < 50; i++) {
+        vert = rand() % vs->maxsize;
+        Bitmap_Set_Shifted(vs->bitBuffer, vert, indexShift, vs->size_bitarray);
+        assert(Bitmap_Test_Shifted(vs->bitBuffer, vert, indexShift, vs->size_bitarray));
+        Bitmap_Set(vs->bitArray, vert);
+    }
+
+
+
+    // transform shifted buffer back
+    unsigned long long *outBuff;
+    outBuff = (unsigned long long*) malloc(vs->size_bitarray * sizeof(unsigned long long));
+    for (int block = 0; block < vs->mpi_size; block++) {
+        block_other = (block - vs->mpi_rank + vs->mpi_size) % vs->mpi_size;
+        for (size_t i = 0; i < block_nElements_input[block]; i++) {
+            outBuff[blockIndices_input[block] + i] = vs->bitBuffer[blockIndices_buffer[block_other] + i];
+        }
+    }
+    
+    for (size_t i = 0; i < vs->size_bitarray; i++) {
+        if(!(vs->bitArray[i] == outBuff[i])){
+            printf("%ld\n", i);
+            return;
+        }
+    }
     
 
 
