@@ -115,9 +115,10 @@ void test_Iterator_dense(){
 
 void test_Allreduce(void (*reduceFunc) (Vertexset*, int)){
     bool isCorrect = true;
+    bool verbose = false;
 
-    int setSize = 10000;
-    int insertions = 654;
+    int setSize = 2500;
+    int insertions = 2500;
 
     Vertexset vs, control;
     Vertexset_Init(&vs, setSize, MPI_COMM_WORLD);
@@ -154,17 +155,40 @@ void test_Allreduce(void (*reduceFunc) (Vertexset*, int)){
         } 
     }
 
+    if (verbose)
+    if (rank==1){
+        vertexSetIterator_Reset(&it);
+        while (vertexSetIterator_Has_next(&it)) {
+            val = vertexSetIterator_Next(&it);
+            printf("%d ", val);
+        }
+    }
+
+
     // check if reference set is subset of vertexset
     while (vertexSetIterator_Has_next(&it_control)) {
         val = vertexSetIterator_Next(&it_control);
-
         if (!Vertexset_Contains(&vs, val)) { // value can not be found in reference
             isCorrect = false;
             break;
         } 
     }
+
+    if(verbose)
+    if(rank==0){
+        printf("\ncontrol: ");
+        vertexSetIterator_Reset(&it_control);
+        while (vertexSetIterator_Has_next(&it_control)) {
+            val = vertexSetIterator_Next(&it_control);
+            printf("%d ", val);
+        }
+        printf("\n");
+    }
     
- 
+    if(verbose)
+    if (isCorrect) {
+        printf("Rank %d is correct!\n", rank);
+    }
     
 
     // Check if other ranks had problems
