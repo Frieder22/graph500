@@ -134,17 +134,6 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION);
 void Vertexset_Allreduce_Approximate_Halfing(Vertexset* vs, int VERTEXSET_OPERATION);
 
 
-/**
- * Performs an Allreduce operation with vertex sets from
- * other ranks. At the beginning sparse representation is used and
- * for later communication rounds, switch to dense communication.
- * Time complexities, if vs is already in sparse representation:
- * best case (only sparse): O(log(p)*k*2^(log_2(p+1))-1)
- * worst case (only dense): O(log(p)*(n + n + k))
- * @param vs corresponding Vertexset object 
- * @param VERTEXSET_OPERATION which logical operation should be applied
- */
-void Vertexset_Allreduce_Dynamic(Vertexset* vs, int VERTEXXSET_OPERATION);
 
 /**
  * Prints the elements saved in Vertex set. At most 30 elements

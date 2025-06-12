@@ -28,36 +28,6 @@ void Vertexset_Update_Sizes(int** sizesAll, int** buffer, int rank_diff, int mpi
     *buffer = temp;
 };
 
-// from https://www.geeksforgeeks.org/qsort-function-in-c/
-// Changed to sort descending
-int comp_desc(const void *a, const void *b) {
-    return (*(int *)b - *(int *)a);
-};
-int Vertexset_Find_critical_iteration(const Vertexset* vs){
-    const int mpi_size = vs->mpi_size;
-    const int *sizes = vs->sizesAll;
-    
-    // copy sizes array
-    int sizes_copy[mpi_size];
-    memcpy(sizes_copy, sizes, mpi_size);
-
-    // sort sizes_copy in descending order
-    qsort(sizes_copy, mpi_size, sizeof(int), comp_desc);
-
-    // perform inclusive scan until critical size is reached
-    int count;
-    for (count = 0; count < mpi_size - 1; count++) {
-        sizes_copy[count + 1] += sizes_copy[count];
-        if (sizes_copy[count + 1] >  vs->sizeCrit) {
-            break;
-        }
-    }
-    
-    // #count ranks are needed in worst case to overshoot
-    // we need to switch in worst case floor(log_2(count)) iteration rounds
-    return Vertexset_Log2_floor(count);
-}
-
 
 void Vertexset_Init(Vertexset* vs, uint32_t maxsize, MPI_Comm MPI_COMM){
     vs->maxsize = maxsize;
@@ -617,73 +587,6 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* vs, int VERTEXSET_OPERAT
     vs->isdense = true;
 };
 
-void Vertexset_Allreduce_Dynamic(Vertexset* vs, int VERTEXSET_OPERATION){
-    // Check if OR operation is used (other is not implemented yet)
-    assert(VERTEXSET_OPERATION == VERTEXSET_OR);
-
-    // Check if size of Communicatior is power of 2
-    assert((vs->mpi_size & (vs->mpi_size - 1)) == 0);
-    
-    // all processes should have a sparse representation
-    if (vs->isdense) {
-        Vertexset_TransformToSparse(vs);
-    }
-
-    // calculate numver of communication rounds
-    int max_iterations = Vertexset_Log2_floor(vs->mpi_size);
-    
-    // find the sizes of all the other ranks
-    int size_int = (int) vs->sizeSparse;
-    MPI_Allgather(&size_int, 1, MPI_INT, vs->sizesAll, 1, MPI_INT, vs->MPI_COMM);
-    
-    // find the iteration round, when commucication should switch to dense variant
-    int crit_iteration = max_iterations; // = Vertexset_Find_critical_iteration(vs);
-    
-    // inits for actual communication
-    int rank_diff, recv_rank, send_rank, round;
-    int *buffer;
-    buffer = (int*) malloc(sizeof(int)*vs->mpi_size);
-    rank_diff = 1;
-    
-    // communication rounds sparse
-    for (round = 0; round < crit_iteration; round++) {
-        send_rank = (vs->mpi_rank + rank_diff) % vs->mpi_size;
-        recv_rank = (vs->mpi_rank - rank_diff + vs->mpi_size) % vs->mpi_size;
-        MPI_Sendrecv(vs->sparseArray,                           vs->sizesAll[vs->mpi_rank], MPI_UINT32_T, send_rank, round,
-                     vs->sparseArray + vs->sizesAll[recv_rank], vs->sizesAll[recv_rank],    MPI_UINT32_T, recv_rank, round,
-                    vs->MPI_COMM, MPI_STATUS_IGNORE);
-        Vertexset_Update_Sizes(&vs->sizesAll, &buffer, rank_diff, vs->mpi_size);        
-        
-        // double rank shift
-        rank_diff <<= 1;
-    }
-    vs->sizeSparse = vs->sizesAll[vs->mpi_rank];
-
-    // transform to dense
-    if (round < max_iterations) {
-        Vertexset_TransformToDense(vs);
-    }
-    
-
-    // communication rounds dense
-    for (round = crit_iteration; round < max_iterations; round++) {
-        send_rank = (vs->mpi_rank + rank_diff) % vs->mpi_size;
-        recv_rank = (vs->mpi_rank - rank_diff + vs->mpi_size) % vs->mpi_size;
-        MPI_Sendrecv(vs->bitArray, vs->size_bitarray, MPI_UINT64_T, send_rank, round,
-                     vs->bitBuffer, vs->size_bitarray, MPI_UINT64_T, recv_rank, round,
-                    vs->MPI_COMM, MPI_STATUS_IGNORE);
-
-        // perform logical OR
-        for (size_t i = 0; i < vs->size_bitarray; i++) {
-            vs->bitArray[i] |= vs->bitBuffer[i];
-        }
-        
-        // double the rank difference
-        rank_diff <<= 1;
-    }
-
-    free(buffer);
-};
 
 
 void Vertexset_PrintSet(Vertexset* vs){
