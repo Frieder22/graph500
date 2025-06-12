@@ -35,4 +35,4 @@ perf_red_approxHalfing: perf
 	mpirun -np 4 ./$(build)/perf.o 1
 
 clean:
-	rm -rf build
+	rm -rf ../build

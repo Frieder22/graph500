@@ -117,8 +117,8 @@ void test_Allreduce(void (*reduceFunc) (Vertexset*, int)){
     bool isCorrect = true;
     bool verbose = false;
 
-    int setSize = 2500;
-    int insertions = 2500;
+    int setSize = 10000000;
+    int insertions = 90000;
 
     Vertexset vs, control;
     Vertexset_Init(&vs, setSize, MPI_COMM_WORLD);
