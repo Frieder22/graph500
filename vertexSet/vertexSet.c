@@ -466,6 +466,7 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* vs, int VERTEXSET_OPERAT
     int startIndex;
     int tag;
     MPI_Status status;
+    MPI_Request req;
     int recvCount;
     int shift = vs->mpi_size;
     int shift_old, shift_next;
@@ -489,13 +490,12 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* vs, int VERTEXSET_OPERAT
         criticalSize = nElementsDense * sizeof(unsigned long long) / sizeof(uint32_t);
         
         // decide, which variant should be send
-        // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        if (false && vs->sizeSparse < criticalSize) {
+        if (vs->sizeSparse < criticalSize) {
             // send sparse array
-            MPI_Send(vs->sparseArray, vs->sizeSparse, MPI_INT32_T, sendNeighbor, 100, vs->MPI_COMM);
+            MPI_Isend(vs->sparseArray, vs->sizeSparse, MPI_INT32_T, sendNeighbor, 100, vs->MPI_COMM, &req);
         } else {
             // send dense array
-            MPI_Send(vs->bitBuffer + startIndex, nElementsDense, MPI_UNSIGNED_LONG_LONG, sendNeighbor, 200, vs->MPI_COMM);
+            MPI_Isend(vs->bitBuffer + startIndex, nElementsDense, MPI_UNSIGNED_LONG_LONG, sendNeighbor, 200, vs->MPI_COMM, &req);
         }
 
         
@@ -509,6 +509,10 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* vs, int VERTEXSET_OPERAT
             MPI_Get_count(&status, MPI_INT32_T, &recvCount);
             
             MPI_Recv(vs->sparseBuffer, recvCount, MPI_INT32_T, recvNeighbor, 100, vs->MPI_COMM, MPI_STATUS_IGNORE);
+
+            // Wait until send buffer message is safe
+            MPI_Wait(&req, MPI_STATUS_IGNORE);
+
             int count=vs->sizeSparse;
             int32_t vert;
             // do reduction (append non dublicates and also update bitarray)
@@ -538,6 +542,9 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* vs, int VERTEXSET_OPERAT
 
             // Recieve into buffer. Attention: Here is bitArray used as the buffer!!!
             MPI_Recv(vs->bitArray, recvCount, MPI_UNSIGNED_LONG_LONG, recvNeighbor, 200, vs->MPI_COMM, MPI_STATUS_IGNORE);
+
+            // Wait until send buffer message is safe
+            MPI_Wait(&req, MPI_STATUS_IGNORE);
 
             // do reduction           
             for (int i = 0; i < recvCount; i++) {
@@ -570,13 +577,14 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* vs, int VERTEXSET_OPERAT
         recvNeighbor = (vs->mpi_rank + shift) % vs->mpi_size;
         
         
-        MPI_Send(vs->bitBuffer, blockIndices_buffer[shift_next - shift], MPI_UNSIGNED_LONG_LONG, sendNeighbor, 101, vs->MPI_COMM);
+        MPI_Isend(vs->bitBuffer, blockIndices_buffer[shift_next - shift], MPI_UNSIGNED_LONG_LONG, sendNeighbor, 101, vs->MPI_COMM, &req);
         
 
         recvCount = blockIndices_buffer[shift_next] - blockIndices_buffer[shift];
         
         // Recieve into buffer
         MPI_Recv(vs->bitBuffer + blockIndices_buffer[shift], recvCount, MPI_LONG_LONG, recvNeighbor, 101, vs->MPI_COMM, MPI_STATUS_IGNORE);
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
     }
     
     // transform shifted buffer back
