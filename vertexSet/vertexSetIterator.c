@@ -71,5 +71,3 @@ void vertexSetIterator_Reset(vertexSetIterator* it){
     } 
 };
 
-void vertexSetIterator_Deinit(vertexSetIterator* it) {
-};
