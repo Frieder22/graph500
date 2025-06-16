@@ -559,7 +559,7 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* vs, int VERTEXSET_OPERAT
     
     // decide, if allgather is needed.
     // common ground: originial common ground divided by (2^iterations)
-    if (vs->sizeSparse <= vs->sizeCrit >> iterations) {
+    if (vs->sizeSparse < vs->sizeCrit >> iterations) {
         vs->isdense = false;
         return;
     }
