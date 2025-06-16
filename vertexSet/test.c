@@ -113,12 +113,11 @@ void test_Iterator_dense(){
     printf("--------------------------------------------\n\n");
 };
 
-void test_Allreduce(void (*reduceFunc) (Vertexset*, int)){
+void test_Allreduce(void (*reduceFunc) (Vertexset*, int), int setSize, float filling){
     bool isCorrect = true;
     bool verbose = false;
 
-    int setSize = 10000000;
-    int insertions = 90000;
+    int insertions = (int) setSize * filling;
 
     Vertexset vs, control;
     Vertexset_Init(&vs, setSize, MPI_COMM_WORLD);
@@ -224,12 +223,12 @@ int main(int argc, char *argv[]){
     // test_red_exactHalfing: test reduce 
     if (testNumber == 1){
         assert((size & (size - 1)) == 0); // only works for ranks = 2^k
-        test_Allreduce(Vertexset_Allreduce_Exact_Halfing);
+        test_Allreduce(Vertexset_Allreduce_Exact_Halfing,1000000, 0.3);
     }
 
     // test_red_approxHalfing: test reduce 
     if (testNumber == 2){
-        test_Allreduce(Vertexset_Allreduce_Approximate_Halfing);
+        test_Allreduce(Vertexset_Allreduce_Approximate_Halfing, 100, 0.1);
     }
 
     MPI_Finalize();
