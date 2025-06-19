@@ -35,6 +35,7 @@ void performance_sizeSeries(void (*reduceFunc) (Vertexset*, int), float filling)
             strcat(filepath, filename);
         } else if (reduceFunc == Vertexset_Allreduce_Approximate_Halfing) {
             char filename[] = "approx_Halfing";
+            strcat(filepath, filename);
         } else {
             printf(ANSI_RED "Performance testing for this function is not implemented!\n" ANSI_RESET);
             return;
@@ -346,7 +347,7 @@ int main(int argc, char *argv[]){
             printf("-------------------------------------------------------------\n");
         }
         performance_sizeSeries(Vertexset_Allreduce_Exact_Halfing, 0.1);
-        performance_fillingSeries(Vertexset_Allreduce_Exact_Halfing, 10000000);
+        performance_fillingSeries(Vertexset_Allreduce_Exact_Halfing, 500000);
     }
 
     // perf_red_approxHalfing: measure performance of allreduce 
