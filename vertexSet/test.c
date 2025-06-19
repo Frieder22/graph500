@@ -223,12 +223,22 @@ int main(int argc, char *argv[]){
     // test_red_exactHalfing: test reduce 
     if (testNumber == 1){
         assert((size & (size - 1)) == 0); // only works for ranks = 2^k
-        test_Allreduce(Vertexset_Allreduce_Exact_Halfing,1000000, 0.3);
+        test_Allreduce(Vertexset_Allreduce_Exact_Halfing,1000000, 0.01);
+        test_Allreduce(Vertexset_Allreduce_Exact_Halfing,100, 1.0);
+        test_Allreduce(Vertexset_Allreduce_Exact_Halfing,1, 0.5);
+        test_Allreduce(Vertexset_Allreduce_Exact_Halfing,63, 0.3);
+        test_Allreduce(Vertexset_Allreduce_Exact_Halfing,64, 0.3);
+        test_Allreduce(Vertexset_Allreduce_Exact_Halfing,65, 0.3);
     }
 
     // test_red_approxHalfing: test reduce 
-    if (testNumber == 2){
-        test_Allreduce(Vertexset_Allreduce_Approximate_Halfing, 100, 0.1);
+    if (testNumber == 2){        
+        test_Allreduce(Vertexset_Allreduce_Approximate_Halfing,1000000, 0.01);
+        test_Allreduce(Vertexset_Allreduce_Approximate_Halfing,100, 1.0);
+        test_Allreduce(Vertexset_Allreduce_Approximate_Halfing,1, 0.5);
+        test_Allreduce(Vertexset_Allreduce_Approximate_Halfing,63, 0.3);
+        test_Allreduce(Vertexset_Allreduce_Approximate_Halfing,64, 0.3);
+        test_Allreduce(Vertexset_Allreduce_Approximate_Halfing,65, 0.3);
     }
 
     MPI_Finalize();
