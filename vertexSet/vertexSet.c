@@ -550,8 +550,7 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* vs, int VERTEXSET_OPERAT
             }
             
             // set count, that is over critical size
-            vs->sizeSparse = criticalSize + 1;
-            
+            vs->sizeSparse = criticalSize + 2;            
         } else {
             assert("recieved wrong tag" && false);
         }
