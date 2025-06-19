@@ -67,7 +67,7 @@ void Vertexset_Add(Vertexset* vs, uint32_t vertex) {
     if (vs->isdense) {
         Bitmap_Set(vs->bitArray, vertex);
     } else {
-        assert(vs->sizeSparse + 1 < vs->maxsize);
+        assert(vs->sizeSparse <= vs->maxsize);
         vs->sparseArray[vs->sizeSparse] = vertex;
     }
     vs->sizeSparse++;
