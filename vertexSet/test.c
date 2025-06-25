@@ -157,10 +157,12 @@ void test_Allreduce(void (*reduceFunc) (Vertexset*, int), int setSize, float fil
     if (verbose)
     if (rank==1){
         vertexSetIterator_Reset(&it);
+        printf("rank %d: ", rank);
         while (vertexSetIterator_Has_next(&it)) {
             val = vertexSetIterator_Next(&it);
             printf("%d ", val);
         }
+        printf("\n");
     }
 
 
@@ -195,10 +197,10 @@ void test_Allreduce(void (*reduceFunc) (Vertexset*, int), int setSize, float fil
 
     if (rank==0) {
         if (isCorrect) {
-            printf(ANSI_GREEN "Test Allreduce_Exactly_Halfing SUCCESSFUL\n" ANSI_RESET);
+            printf(ANSI_GREEN "Test Allreduce SUCCESSFUL\n" ANSI_RESET);
             printf("--------------------------------------------\n\n");
         } else {
-            printf(ANSI_RED "Test Allreduce_Exactly_Halfing FAILED\n" ANSI_RESET );
+            printf(ANSI_RED "Test Allreduce FAILED\n" ANSI_RESET );
             printf("--------------------------------------------\n\n");
         }        
     }
@@ -239,6 +241,15 @@ int main(int argc, char *argv[]){
         test_Allreduce(Vertexset_Allreduce_Approximate_Halfing,63, 0.3);
         test_Allreduce(Vertexset_Allreduce_Approximate_Halfing,64, 0.3);
         test_Allreduce(Vertexset_Allreduce_Approximate_Halfing,65, 0.3);
+    }
+
+    if (testNumber == 3){        
+        //test_Allreduce(Vertexset_Allreduce_Ring_Comm,1000000, 0.01);
+        test_Allreduce(Vertexset_Allreduce_Ring_Comm,260, 0.05);
+        //test_Allreduce(Vertexset_Allreduce_Ring_Comm,1, 0.5);
+        //test_Allreduce(Vertexset_Allreduce_Ring_Comm,63, 0.3);
+        //test_Allreduce(Vertexset_Allreduce_Ring_Comm,64, 0.3);
+        //test_Allreduce(Vertexset_Allreduce_Ring_Comm,65, 0.3);
     }
 
     MPI_Finalize();

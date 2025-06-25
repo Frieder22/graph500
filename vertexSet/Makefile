@@ -25,6 +25,9 @@ test_red_exactHalfing: test
 test_red_approxHalfing: test
 	mpirun -np 4 ./$(build)/test.o 2
 
+test_red_ringComm: test
+	mpirun -np 4 ./$(build)/test.o 3
+
 perf: performance.c
 	$(GCC) $(CFLAGS) -o $(build)/perf.o performance.c $(SOURCES)
 
