@@ -36,6 +36,12 @@ void performance_sizeSeries(void (*reduceFunc) (Vertexset*, int), float filling)
         } else if (reduceFunc == Vertexset_Allreduce_Approximate_Halfing) {
             char filename[] = "approx_Halfing";
             strcat(filepath, filename);
+        } else if (reduceFunc == Vertexset_Allreduce_Ring_Comm) {
+            char filename[] = "ring_Comm";
+            strcat(filepath, filename);
+        } else if (reduceFunc == Vertexset_Allreduce_Dense) {
+            char filename[] = "dense";
+            strcat(filepath, filename);
         } else {
             printf(ANSI_RED "Performance testing for this function is not implemented!\n" ANSI_RESET);
             return;
@@ -56,7 +62,7 @@ void performance_sizeSeries(void (*reduceFunc) (Vertexset*, int), float filling)
     }
 
     // Definition of testing range
-    int sizes[] = {20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000, 2000000, 5000000, 10000000};
+    int sizes[] = {20, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000, 2000000, 5000000, 10000000};
     int N = sizeof(sizes) / sizeof(int);
 
 
@@ -190,6 +196,13 @@ void performance_fillingSeries(void (*reduceFunc) (Vertexset*, int), int setSize
             strcat(filepath, filename);
         } else if (reduceFunc == Vertexset_Allreduce_Approximate_Halfing) {
             char filename[] = "approx_Halfing";
+            strcat(filepath, filename);
+        } else if (reduceFunc == Vertexset_Allreduce_Ring_Comm) {
+            char filename[] = "ring_Comm";
+            strcat(filepath, filename);
+        } else if (reduceFunc == Vertexset_Allreduce_Dense) {
+            char filename[] = "dense";
+            strcat(filepath, filename);
         } else {
             printf(ANSI_RED "Performance testing for this function is not implemented!\n" ANSI_RESET);
             return;
@@ -210,7 +223,7 @@ void performance_fillingSeries(void (*reduceFunc) (Vertexset*, int), int setSize
     }
 
     // Definition of testing range
-    float fillings[] = {0.01, 0.02, 0.03, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95};
+    float fillings[] = {0.005, 0.01, 0.02, 0.03, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35}; //, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95};
     int N = sizeof(fillings) / sizeof(float);
 
 
@@ -347,7 +360,7 @@ int main(int argc, char *argv[]){
             printf("-------------------------------------------------------------\n");
         }
         performance_sizeSeries(Vertexset_Allreduce_Exact_Halfing, 0.1);
-        performance_fillingSeries(Vertexset_Allreduce_Exact_Halfing, 500000);
+        performance_fillingSeries(Vertexset_Allreduce_Exact_Halfing, 10000000);
     }
 
     // perf_red_approxHalfing: measure performance of allreduce 
@@ -355,6 +368,25 @@ int main(int argc, char *argv[]){
         performance_sizeSeries(Vertexset_Allreduce_Approximate_Halfing, 0.1);
     }
 
+    if (testNumber == 2){
+        if (rank==0) {
+            printf("-------------------------------------------------------------\n");
+            printf("Testing performance of Vertexset_Allreduce_Ring_Comm...\n");
+            printf("-------------------------------------------------------------\n");
+        }
+        performance_sizeSeries(Vertexset_Allreduce_Ring_Comm, 0.1);
+        performance_fillingSeries(Vertexset_Allreduce_Ring_Comm, 10000000);
+    }
+
+    if (testNumber == 3){
+        if (rank==0) {
+            printf("-------------------------------------------------------------\n");
+            printf("Testing performance of Vertexset_Allreduce_Dense...\n");
+            printf("-------------------------------------------------------------\n");
+        }
+        performance_sizeSeries(Vertexset_Allreduce_Dense, 0.1);
+        performance_fillingSeries(Vertexset_Allreduce_Dense, 10000000);
+    }
     MPI_Finalize();
     return 0;
 }

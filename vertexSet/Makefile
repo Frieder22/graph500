@@ -28,6 +28,9 @@ test_red_approxHalfing: test
 test_red_ringComm: test
 	mpirun -np 4 ./$(build)/test.o 3
 
+test_red_dense: test
+	mpirun -np 4 ./$(build)/test.o 4
+
 perf: performance.c
 	$(GCC) $(CFLAGS) -o $(build)/perf.o performance.c $(SOURCES)
 
@@ -36,6 +39,12 @@ perf_red_exactHalfing: perf
 
 perf_red_approxHalfing: perf
 	mpirun -np 4 ./$(build)/perf.o 1
+
+perf_red_ringComm: perf
+	mpirun -np 4 ./$(build)/perf.o 2
+
+perf_red_dense: perf
+	mpirun -np 4 ./$(build)/perf.o 3
 
 clean:
 	rm -rf ../build

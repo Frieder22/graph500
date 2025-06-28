@@ -252,6 +252,15 @@ int main(int argc, char *argv[]){
         //test_Allreduce(Vertexset_Allreduce_Ring_Comm,65, 0.3);
     }
 
+    if (testNumber == 4){        
+        test_Allreduce(Vertexset_Allreduce_Dense,1000000, 0.01);
+        test_Allreduce(Vertexset_Allreduce_Dense,100, 1.0);
+        test_Allreduce(Vertexset_Allreduce_Dense,1, 0.5);
+        test_Allreduce(Vertexset_Allreduce_Dense,63, 0.3);
+        test_Allreduce(Vertexset_Allreduce_Dense,64, 0.3);
+        test_Allreduce(Vertexset_Allreduce_Dense,65, 0.3);
+    }
+
     MPI_Finalize();
     return 0;
 }
