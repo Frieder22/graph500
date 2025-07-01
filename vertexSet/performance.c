@@ -19,6 +19,8 @@
 
 #define OUTPUTPATH "../data/performanceData/"
 #define N_DATAPOINTS 10
+#define SETSIZE 500000
+#define SETFILLING 0.1
 
 int rank, size;
 
@@ -359,13 +361,13 @@ int main(int argc, char *argv[]){
             printf("Testing performance of Vertexset_Allreduce_Exact_Halfing...\n");
             printf("-------------------------------------------------------------\n");
         }
-        performance_sizeSeries(Vertexset_Allreduce_Exact_Halfing, 0.1);
-        performance_fillingSeries(Vertexset_Allreduce_Exact_Halfing, 10000000);
+        performance_sizeSeries(Vertexset_Allreduce_Exact_Halfing, SETFILLING);
+        performance_fillingSeries(Vertexset_Allreduce_Exact_Halfing, SETSIZE);
     }
 
     // perf_red_approxHalfing: measure performance of allreduce 
     if (testNumber == 1){
-        performance_sizeSeries(Vertexset_Allreduce_Approximate_Halfing, 0.1);
+        performance_sizeSeries(Vertexset_Allreduce_Approximate_Halfing, SETFILLING);
     }
 
     if (testNumber == 2){
@@ -374,8 +376,8 @@ int main(int argc, char *argv[]){
             printf("Testing performance of Vertexset_Allreduce_Ring_Comm...\n");
             printf("-------------------------------------------------------------\n");
         }
-        performance_sizeSeries(Vertexset_Allreduce_Ring_Comm, 0.1);
-        performance_fillingSeries(Vertexset_Allreduce_Ring_Comm, 10000000);
+        performance_sizeSeries(Vertexset_Allreduce_Ring_Comm, SETFILLING);
+        performance_fillingSeries(Vertexset_Allreduce_Ring_Comm, SETSIZE);
     }
 
     if (testNumber == 3){
@@ -384,8 +386,8 @@ int main(int argc, char *argv[]){
             printf("Testing performance of Vertexset_Allreduce_Dense...\n");
             printf("-------------------------------------------------------------\n");
         }
-        performance_sizeSeries(Vertexset_Allreduce_Dense, 0.1);
-        performance_fillingSeries(Vertexset_Allreduce_Dense, 10000000);
+        performance_sizeSeries(Vertexset_Allreduce_Dense, SETFILLING);
+        performance_fillingSeries(Vertexset_Allreduce_Dense, SETSIZE);
     }
     MPI_Finalize();
     return 0;

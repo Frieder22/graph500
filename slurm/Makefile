@@ -9,20 +9,32 @@ HEADERS = $(VSFOLDER)vertexSet.h $(VSFOLDER)bitmap_custom.h $(VSFOLDER)vertexSet
  
 build = ../build
 
-test_it: 
-	mpirun -np 1 ./$(build)/test.o 0
+test: $(VSFOLDER)test.c $(SOURCES) $(HEADERS)
+	$(GCC) $(CFLAGS) -o $(build)/test.o $(VSFOLDER)test.c $(SOURCES)
 
-test_red_exactHalfing: 
+perf: $(VSFOLDER)performance.c
+	$(GCC) $(CFLAGS) -o $(build)/perf.o $(VSFOLDER)performance.c $(SOURCES)
+
+load_MPI:
+	spack load openmpi@4.1.6
+
+test_red_exactHalfing: test
 	sbatch test_exactly.job
 
-test_red_approxHalfing: 
+test_red_approxHalfing: test
 	sbatch test_approx.job
 
-perf_red_exactHalfing:
+test_red_dense: perf
+	sbatch test_dense.job
+
+perf_red_exactHalfing: perf
 	sbatch performance_exactly.job
 
-perf_red_approxHalfing: 
+perf_red_approxHalfing: perf
 	sbatch performance_approx.job
+
+perf_red_dense: perf
+	sbatch performance_dense.job
 
 copy_to_cluster:
 	scp -r ../vertexSet/ hydra:~/.
@@ -30,3 +42,8 @@ copy_to_cluster:
 
 copy_from_cluster:
 	scp -r hydra:~/data/ ../
+
+.PHONY: clean_Data
+
+clean_Data:
+	rm ../data/performanceData/*
