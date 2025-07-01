@@ -318,6 +318,8 @@ void performance_fillingSeries(void (*reduceFunc) (Vertexset*, int), int setSize
                 }
             }
 
+            // find 
+
             // Find max runtime
             MPI_Allreduce(MPI_IN_PLACE, performance, 3, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 

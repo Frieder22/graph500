@@ -765,24 +765,24 @@ void Vertexset_Allreduce_Dense(Vertexset* vs, int VERTEXSET_OPERATION){
         nElements = blockIdx[startBlock + shift] - startIndex;
 
         // send dense array
-        MPI_Isend(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, commNeighbor, 200, vs->MPI_COMM, &req);
+        //MPI_Isend(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, commNeighbor, 200, vs->MPI_COMM, &req);
 
         // get indices of recieve message
         startBlock = (vs->mpi_rank/shift) * shift;
         startIndexRecv = blockIdx[startBlock];
-        // recvCount = blockIdx[startBlock + shift]-startIndexRecv;
+        recvCount = blockIdx[startBlock + shift]-startIndexRecv;
         
 
-        MPI_Probe(commNeighbor, MPI_ANY_TAG, vs->MPI_COMM, &status);
-        MPI_Get_count(&status, MPI_LONG_LONG, &recvCount);
-        //MPI_Sendrecv(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, commNeighbor, 200,
-        //            vs->bitBuffer, recvCount, MPI_UNSIGNED_LONG_LONG, commNeighbor, 200, vs->MPI_COMM, MPI_STATUS_IGNORE);
+        //MPI_Probe(commNeighbor, MPI_ANY_TAG, vs->MPI_COMM, &status);
+        //MPI_Get_count(&status, MPI_LONG_LONG, &recvCount);
+        MPI_Sendrecv(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, commNeighbor, 200,
+                    vs->bitBuffer, recvCount, MPI_UNSIGNED_LONG_LONG, commNeighbor, 200, vs->MPI_COMM, MPI_STATUS_IGNORE);
 
         
 
         // Recieve into buffer
-        MPI_Recv(vs->bitBuffer, recvCount, MPI_UNSIGNED_LONG_LONG, commNeighbor, 200, vs->MPI_COMM, MPI_STATUS_IGNORE);
-        MPI_Wait(&req, MPI_STATUS_IGNORE);
+        // MPI_Recv(vs->bitBuffer, recvCount, MPI_UNSIGNED_LONG_LONG, commNeighbor, 200, vs->MPI_COMM, MPI_STATUS_IGNORE);
+        // MPI_Wait(&req, MPI_STATUS_IGNORE);
         // do reduction
         for (int i = startIndexRecv; i < blockIdx[startBlock + shift]; i++) {
             vs->bitArray[i] |= vs->bitBuffer[i-startIndexRecv];
