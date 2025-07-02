@@ -136,6 +136,11 @@ void test_Allreduce(void (*reduceFunc) (Vertexset*, int), int setSize, float fil
         }
     }
     
+    //Allreduce_Dense only works with dense arrays
+    if(reduceFunc == Vertexset_Allreduce_Dense){
+        Vertexset_TransformToDense(&vs);
+    }
+
     // perform allreduce
     (*reduceFunc) (&vs, VERTEXSET_OR);
 
