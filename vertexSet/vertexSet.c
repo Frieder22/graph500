@@ -238,7 +238,7 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
     // do reduce_scatter
     int commNeighbor;
     int startBlock;
-    int startIndex;
+    int startIndex, startIndexRecv;
     int nElements;
     int tag;
     MPI_Status status;
@@ -338,31 +338,19 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
         startIndex = blockIdx[startBlock];
         nElements = blockIdx[startBlock + shift] - startIndex;
         
-        //if (shift==2)
-        //printf("nElements: %d\n", nElements);
-        MPI_Isend(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, commNeighbor, 101, vs->MPI_COMM, &req);
-        
-        // calculate start inde and recv count
+        // calculate start index and recv count
         startBlock = (commNeighbor/shift) * shift;
-        startIndex = blockIdx[startBlock];
-        recvCount = blockIdx[startBlock + shift]-startIndex;
+        startIndexRecv = blockIdx[startBlock];
+        recvCount = blockIdx[startBlock + shift]-startIndexRecv;
         
-        // Recieve into buffer
-        MPI_Recv(vs->bitBuffer, recvCount, MPI_LONG_LONG, commNeighbor, 101, vs->MPI_COMM, MPI_STATUS_IGNORE);
-        
-        // Send buffer can be used again
-        MPI_Wait(&req, MPI_STATUS_IGNORE);
-        
-        // do fill in
-        for (int i = startIndex; i < blockIdx[startBlock + shift]; i++) {
-            vs->bitArray[i] = vs->bitBuffer[i-startIndex];
-        }  
+        // Sending and recieval of blocks
+        MPI_Sendrecv(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, commNeighbor, 101,
+                     vs->bitArray + startIndexRecv, recvCount, MPI_UNSIGNED_LONG_LONG, commNeighbor, 101,
+                    vs->MPI_COMM, MPI_STATUS_IGNORE);
     }
 
     // must be dense, if allgather was needed
     vs->isdense = true;
-    
-
 };
 
 
@@ -800,25 +788,16 @@ void Vertexset_Allreduce_Dense(Vertexset* vs, int VERTEXSET_OPERATION){
         startIndex = blockIdx[startBlock];
         nElements = blockIdx[startBlock + shift] - startIndex;
         
-
-        MPI_Isend(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, commNeighbor, 101, vs->MPI_COMM, &req);
-        
-        // calculate start inde and recv count
+        // calculate start index and recv count
         startBlock = (commNeighbor/shift) * shift;
-        startIndex = blockIdx[startBlock];
-        recvCount = blockIdx[startBlock + shift]-startIndex;
+        startIndexRecv = blockIdx[startBlock];
+        recvCount = blockIdx[startBlock + shift]-startIndexRecv;
         
-        // Recieve into buffer
-        MPI_Recv(vs->bitBuffer, recvCount, MPI_LONG_LONG, commNeighbor, 101, vs->MPI_COMM, MPI_STATUS_IGNORE);
-        
-        // Send buffer can be used again
-        MPI_Wait(&req, MPI_STATUS_IGNORE);
-        
-        // do fill in
-        for (int i = startIndex; i < blockIdx[startBlock + shift]; i++) {
-            vs->bitArray[i] = vs->bitBuffer[i-startIndex];
-        }  
-    }    
+        // Sending and recieval of blocks
+        MPI_Sendrecv(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, commNeighbor, 101,
+                     vs->bitArray + startIndexRecv, recvCount, MPI_UNSIGNED_LONG_LONG, commNeighbor, 101,
+                    vs->MPI_COMM, MPI_STATUS_IGNORE);
+    }  
 };
 
 
