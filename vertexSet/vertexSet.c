@@ -553,15 +553,10 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* const vs, const int VERT
         sendNeighbor = (vs->mpi_rank - shift + vs->mpi_size) % vs->mpi_size;
         recvNeighbor = (vs->mpi_rank + shift) % vs->mpi_size;
         
-        
-        MPI_Isend(vs->bitBuffer, blockIndices_buffer[shift_next - shift], MPI_UNSIGNED_LONG_LONG, sendNeighbor, 101, vs->MPI_COMM, &req);
-        
-
         recvCount = blockIndices_buffer[shift_next] - blockIndices_buffer[shift];
-        
-        // Recieve into buffer
-        MPI_Recv(vs->bitBuffer + blockIndices_buffer[shift], recvCount, MPI_LONG_LONG, recvNeighbor, 101, vs->MPI_COMM, MPI_STATUS_IGNORE);
-        MPI_Wait(&req, MPI_STATUS_IGNORE);
+        MPI_Sendrecv(vs->bitBuffer, blockIndices_buffer[shift_next - shift], MPI_UNSIGNED_LONG_LONG, sendNeighbor, 101,
+                     vs->bitBuffer + blockIndices_buffer[shift], recvCount, MPI_UNSIGNED_LONG_LONG, recvNeighbor,101,
+                     vs->MPI_COMM, MPI_STATUS_IGNORE);
     }
     
     // transform shifted buffer back
