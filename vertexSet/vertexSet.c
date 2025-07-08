@@ -182,7 +182,7 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* const vs, const int VERTEXSET_
     if (!(vs->isdense)) {
         Bitmap_Clean(vs->bitArray, vs->size_bitarray);
         int count=0;
-        int32_t vert;
+        uint32_t vert;
         for (size_t i = 0; i < vs->sizeSparse; i++) {
             vert = vs->sparseArray[i];
             if (count <= criticalSize/2){
@@ -267,7 +267,7 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* const vs, const int VERTEXSET_
 
             MPI_Wait(&req, MPI_STATUS_IGNORE);
             int count=vs->sizeSparse;
-            int32_t vert;
+            uint32_t vert;
             // do reduction (append non dublicates and also update bitarray)
             for (size_t i = 0; i < recvCount; i++)  {
                 vert = vs->sparseBuffer[i];
@@ -382,7 +382,7 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* const vs, const int VERT
     if (!(vs->isdense)) {
         Bitmap_Clean(vs->bitArray, vs->size_bitarray);
         int count=0;
-        int32_t vert;
+        uint32_t vert;
         for (size_t i = 0; i < vs->sizeSparse; i++) {
             vert = vs->sparseArray[i];
             if (count <= criticalSize/2){
@@ -412,7 +412,7 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* const vs, const int VERT
     }
 
     // filling shifted dense buffer
-    int32_t indexShift = blockIndices_input[vs->mpi_rank];
+    int indexShift = blockIndices_input[vs->mpi_rank];
     for (size_t i = 0; i < vs->size_bitarray; i++) {
         vs->bitBuffer[i] = vs->bitArray[(i+indexShift) % vs->size_bitarray];
     }
@@ -490,7 +490,7 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* const vs, const int VERT
             MPI_Wait(&req, MPI_STATUS_IGNORE);
 
             int count=vs->sizeSparse;
-            int32_t vert;
+            uint32_t vert;
             // do reduction (append non dublicates and also update bitarray)
             for (size_t i = 0; i < recvCount; i++)  {
                 vert = vs->sparseBuffer[i];
@@ -587,7 +587,7 @@ void Vertexset_Allreduce_Ring_Comm(Vertexset* const vs, const int VERTEXSET_OPER
     if (!(vs->isdense)) {
         Bitmap_Clean(vs->bitArray, vs->size_bitarray);
         int count=0;
-        int32_t vert;
+        uint32_t vert;
         for (size_t i = 0; i < vs->sizeSparse; i++) {
             vert = vs->sparseArray[i];
             if (count <= (criticalSize/vs->mpi_size)){
@@ -662,7 +662,7 @@ void Vertexset_Allreduce_Ring_Comm(Vertexset* const vs, const int VERTEXSET_OPER
             MPI_Wait(&req, MPI_STATUS_IGNORE);
 
             int count=vs->sizeSparse;
-            int32_t vert;
+            uint32_t vert;
             // do reduction (append non dublicates and also update bitarray)
             for (size_t j = 0; j < recvCount; j++)  {
                 vert = vs->sparseBuffer[j];
