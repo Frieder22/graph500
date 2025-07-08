@@ -15,7 +15,7 @@
  * @param array array, that represents the bitmap.
  * @param vertex value, that should be set
  */
-static inline void Bitmap_Set(unsigned long long *array, uint32_t vertex){
+static inline void Bitmap_Set(unsigned long long* const array, const uint32_t vertex){
     array[vertex ulong_divide] |= (1ULL << (vertex ulong_mask));
 }
 
@@ -28,7 +28,7 @@ static inline void Bitmap_Set(unsigned long long *array, uint32_t vertex){
  * @param shift size of shift
  * @param size_bitarray number of words the bitarray has (elements in array)
  */
-static inline void Bitmap_Set_Shifted(unsigned long long *array, uint32_t vertex, int shift, int size_bitarray){
+static inline void Bitmap_Set_Shifted(unsigned long long* const array, const uint32_t vertex, const int shift, const int size_bitarray){
     array[((vertex ulong_divide) - shift + size_bitarray) % size_bitarray] |= (1ULL << (vertex ulong_mask));
 }
 
@@ -37,7 +37,7 @@ static inline void Bitmap_Set_Shifted(unsigned long long *array, uint32_t vertex
  * @param array array, that represents the bitmap.
  * @param vertex value to test.
  */
-static inline bool Bitmap_Test(unsigned long long *array, uint32_t vertex){
+static inline bool Bitmap_Test( const unsigned long long* const array, const uint32_t vertex){
     return (array[vertex ulong_divide] & (1ULL << (vertex ulong_mask))) != 0;
 }
 
@@ -49,7 +49,7 @@ static inline bool Bitmap_Test(unsigned long long *array, uint32_t vertex){
  * @param shift size of shift
  * @param size_bitarray number of words the bitarray has (elements in array)
  */
-static inline bool Bitmap_Test_Shifted(unsigned long long *array, uint32_t vertex, int shift, int size_bitarray){
+static inline bool Bitmap_Test_Shifted(const unsigned long long* const array, const uint32_t vertex, const int shift, const int size_bitarray){
     return (array[((vertex ulong_divide) - shift + size_bitarray) % size_bitarray] & (1ULL << (vertex ulong_mask))) != 0;
 }
 
@@ -58,7 +58,7 @@ static inline bool Bitmap_Test_Shifted(unsigned long long *array, uint32_t verte
  * @param array array, that represents the bitmap.
  * @param size_bitarray number of words the bitarray has (elements in array)
  */
-static inline void Bitmap_Clean(unsigned long long *array, size_t size_bitarray){
+static inline void Bitmap_Clean(unsigned long long* const array, const size_t size_bitarray){
     memset(array, 0, size_bitarray * sizeof(unsigned long long));
 }
 

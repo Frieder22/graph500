@@ -2,8 +2,8 @@
 #include "vertexSetIterator.h"
 #include "bitmap_custom.h"
 
-void vertexSetIterator_Init(vertexSetIterator* it, Vertexset* vs) {
-    // set corresponding vertexx set
+void vertexSetIterator_Init(vertexSetIterator* const it, const Vertexset* const vs) {
+    // set corresponding vertex set
     it->vs = vs;
 
     // set corresponding representation
@@ -20,7 +20,7 @@ void vertexSetIterator_Init(vertexSetIterator* it, Vertexset* vs) {
     } 
 };
 
-bool vertexSetIterator_Has_next(vertexSetIterator* it){
+bool vertexSetIterator_Has_next(vertexSetIterator* const it){
     if (it->isdense) {
         for ( size_t i = it->wordIdx; i < it->vs->size_bitarray; i++){
             // find a word thats not 0
@@ -51,7 +51,7 @@ bool vertexSetIterator_Has_next(vertexSetIterator* it){
     }
 };
 
-uint32_t vertexSetIterator_Next(vertexSetIterator* it){
+uint32_t vertexSetIterator_Next(vertexSetIterator* const it){
     if (it->isdense) {
         return it->currVertex;
     } else {
@@ -61,7 +61,7 @@ uint32_t vertexSetIterator_Next(vertexSetIterator* it){
     
 };
 
-void vertexSetIterator_Reset(vertexSetIterator* it){
+void vertexSetIterator_Reset(vertexSetIterator* const it){
     if (it->isdense) {
         it->wordIdx = 0;
         it->wordShift = 0;

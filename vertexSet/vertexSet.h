@@ -39,7 +39,7 @@ typedef struct Vertexset{
  * @param maxsize Maximum number of vertices, that can be added
  * @param MPI_COMM MPI communicator, where reduce operation are possible
  */
-void Vertexset_Init(Vertexset* vs, uint32_t maxsize, MPI_Comm MPI_COMM);
+void Vertexset_Init(Vertexset* const vs, const uint32_t maxsize, const MPI_Comm MPI_COMM);
 
 /**
  * Adds a vertex to vertexset.
@@ -59,7 +59,7 @@ void Vertexset_Add(Vertexset* vs, uint32_t vertex);
  * @param vs corresponding Vertexset object 
  * @param vertex checked vertex
  */
-bool Vertexset_Contains(Vertexset* vs, uint32_t vertex);
+bool Vertexset_Contains(const Vertexset* vs, uint32_t vertex);
 
 /**
  * Resets the memory of vertexset. After reset the VertexSet is

@@ -18,18 +18,8 @@ int Vertexset_Log2_floor(int x){
     return i;
 };
 
-void Vertexset_Update_Sizes(int** sizesAll, int** buffer, int rank_diff, int mpi_size) {
-    int *temp;
-    for (int i = 0; i < mpi_size; i++) {
-        (*buffer)[i] = (*sizesAll)[i] + (*sizesAll)[ (i + mpi_size - 1) % mpi_size];
-    }
-    temp = *sizesAll;
-    *sizesAll = *buffer;
-    *buffer = temp;
-};
 
-
-void Vertexset_Init(Vertexset* vs, uint32_t maxsize, MPI_Comm MPI_COMM){
+void Vertexset_Init(Vertexset* const vs, const uint32_t maxsize, const MPI_Comm MPI_COMM){
     vs->maxsize = maxsize;
     
     // init bitArray
@@ -62,7 +52,7 @@ void Vertexset_Init(Vertexset* vs, uint32_t maxsize, MPI_Comm MPI_COMM){
     vs->isdense = false;
 };
 
-void Vertexset_Add(Vertexset* vs, uint32_t vertex) {
+void Vertexset_Add(Vertexset* const vs, const uint32_t vertex) {
     assert(vertex < vs->maxsize);
     if (vs->isdense) {
         Bitmap_Set(vs->bitArray, vertex);
@@ -73,7 +63,7 @@ void Vertexset_Add(Vertexset* vs, uint32_t vertex) {
     vs->sizeSparse++;
 };
 
-bool Vertexset_Contains(Vertexset* vs, uint32_t vertex) {
+bool Vertexset_Contains(const Vertexset* const vs, const uint32_t vertex) {
     assert(vertex < vs->maxsize);
     if (vs->isdense) {
         return Bitmap_Test(vs->bitArray, vertex);
@@ -87,7 +77,7 @@ bool Vertexset_Contains(Vertexset* vs, uint32_t vertex) {
     }
 };
 
-void Vertexset_Clean(Vertexset* vs) {
+void Vertexset_Clean(Vertexset* const vs) {
     if (vs->isdense) {
         Bitmap_Clean(vs->bitArray, vs->size_bitarray);
         vs->sizeSparse = 0;
@@ -97,7 +87,7 @@ void Vertexset_Clean(Vertexset* vs) {
     }
 };
 
-bool Vertexset_TransformToDense(Vertexset* vs) {
+bool Vertexset_TransformToDense(Vertexset* const vs) {
     // only do, if it's sparse
     if (!vs->isdense){
         uint32_t vertex;
@@ -111,7 +101,7 @@ bool Vertexset_TransformToDense(Vertexset* vs) {
     
 };
 
-bool Vertexset_TransformToSparse(Vertexset* vs) {
+bool Vertexset_TransformToSparse(Vertexset* const vs) {
     // only do, if it is dense
     if (vs->isdense){
         unsigned long long word;
@@ -136,7 +126,7 @@ bool Vertexset_TransformToSparse(Vertexset* vs) {
     }
 }
 
-void Vertexset_Allreduce(Vertexset* vs, int VERTEXSET_OP){
+void Vertexset_Allreduce(Vertexset* const vs, const int VERTEXSET_OP){
     // no other variant is implemented yet
     // use only sparse communication
     Vertexset_TransformToSparse(vs);
@@ -144,7 +134,7 @@ void Vertexset_Allreduce(Vertexset* vs, int VERTEXSET_OP){
 }
 
 
-void Vertexset_Allreduce_Pure(Vertexset* vs, int VERTEXSET_OPERATION){
+void Vertexset_Allreduce_Pure(Vertexset* const vs, const int VERTEXSET_OPERATION){
     assert(VERTEXSET_OPERATION == VERTEXSET_OR); //no other version is implemented
     // get size information from other ranks
     int size_int = (int) vs->sizeSparse;
@@ -181,7 +171,7 @@ void Vertexset_Allreduce_Pure(Vertexset* vs, int VERTEXSET_OPERATION){
     assert(vs->sizeSparse >= 0);
 };
 
-void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
+void Vertexset_Allreduce_Exact_Halfing(Vertexset* const vs, const int VERTEXSET_OPERATION) {
     assert(VERTEXSET_OPERATION == VERTEXSET_OR); // no other operator implemented
     assert((vs->mpi_size & (vs->mpi_size - 1)) == 0); // communicator must be size of 2^k
     
@@ -354,7 +344,7 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
 };
 
 
-void Vertexset_Allreduce_Approximate_Halfing(Vertexset* vs, int VERTEXSET_OPERATION) {
+void Vertexset_Allreduce_Approximate_Halfing(Vertexset* const vs, const int VERTEXSET_OPERATION) {
     assert(VERTEXSET_OPERATION == VERTEXSET_OR); //no other version is implemented
 
     int criticalSize = vs->sizeCrit;
@@ -580,7 +570,7 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* vs, int VERTEXSET_OPERAT
     vs->isdense = true;
 };
 
-void Vertexset_Allreduce_Ring_Comm(Vertexset* vs, int VERTEXSET_OPERATION){
+void Vertexset_Allreduce_Ring_Comm(Vertexset* const vs, const int VERTEXSET_OPERATION){
     assert(VERTEXSET_OPERATION == VERTEXSET_OR); // no other operator implemented
     
     // find block indices
@@ -720,7 +710,7 @@ void Vertexset_Allreduce_Ring_Comm(Vertexset* vs, int VERTEXSET_OPERATION){
     }
 };
 
-void Vertexset_Allreduce_Dense(Vertexset* vs, int VERTEXSET_OPERATION){
+void Vertexset_Allreduce_Dense(Vertexset* const vs, const int VERTEXSET_OPERATION){
     assert(VERTEXSET_OPERATION == VERTEXSET_OR); // no other operator implemented
     assert((vs->mpi_size & (vs->mpi_size - 1)) == 0); // communicator must be size of 2^k
     //assert(vs->isdense);
@@ -802,7 +792,7 @@ void Vertexset_Allreduce_Dense(Vertexset* vs, int VERTEXSET_OPERATION){
 
 
 
-void Vertexset_PrintSet(Vertexset* vs){
+void Vertexset_PrintSet(Vertexset* const vs){
     if(vs->isdense){
         Vertexset_TransformToSparse(vs);
     }
@@ -819,9 +809,13 @@ void Vertexset_PrintSet(Vertexset* vs){
 };
 
 
-void Vertexset_Deinit(Vertexset* vs){
+void Vertexset_Deinit(Vertexset* const vs){
     free(vs->bitArray);
     free(vs->sparseArray);
+    free(vs->bitBuffer);
+    free(vs->sparseBuffer);
+    free(vs->displ);
+    free(vs->sizesAll);
 };
 
 
