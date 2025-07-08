@@ -24,7 +24,7 @@ typedef struct vertexSetIterator {
  * @param vs vertexSet, the iterator is for
  * @param it iterator, that should be inititalized
  */
-void vertexSetIterator_Init(vertexSetIterator* it, const Vertexset* vs);
+void vertexSetIterator_Init(vertexSetIterator* it, Vertexset* vs);
 
 /**
  * Checks, if the iterator can return another value (true)

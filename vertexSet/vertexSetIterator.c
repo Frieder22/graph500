@@ -2,7 +2,7 @@
 #include "vertexSetIterator.h"
 #include "bitmap_custom.h"
 
-void vertexSetIterator_Init(vertexSetIterator* const it, const Vertexset* const vs) {
+void vertexSetIterator_Init(vertexSetIterator* const it, Vertexset* const vs) {
     // set corresponding vertex set
     it->vs = vs;
 
