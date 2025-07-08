@@ -370,6 +370,7 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* const vs, const int VERT
         blockIndices_input[i] = vs->size_bitarray * i / vs->mpi_size;
         block_nElements_input[i-1] = blockIndices_input[i] - blockIndices_input[i-1];
     }
+    int indexShift = blockIndices_input[vs->mpi_rank];
 
     // calculate indices for R buffer
     blockIndices_buffer[0] = 0;
@@ -377,24 +378,24 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* const vs, const int VERT
         blockIndices_buffer[i] = blockIndices_buffer[i - 1] + block_nElements_input[(i - 1 + vs->mpi_rank) % vs->mpi_size ];
         block_nElements_buffer[i-1] = blockIndices_buffer[i] - blockIndices_buffer[i-1];
     }
-    
-    // prepare, if vertexset is sparse
+
+    // fill bitBuffer with shifted blocks
     if (!(vs->isdense)) {
-        Bitmap_Clean(vs->bitArray, vs->size_bitarray);
+        Bitmap_Clean(vs->bitBuffer, vs->size_bitarray);
         int count=0;
         uint32_t vert;
         for (size_t i = 0; i < vs->sizeSparse; i++) {
             vert = vs->sparseArray[i];
             if (count <= criticalSize/2){
                 // add to sparse list and update bitarray
-                if (!(Bitmap_Test(vs->bitArray, vert))) {
+                if (!(Bitmap_Test_Shifted(vs->bitBuffer, vert, indexShift, vs->size_bitarray))) {
                     // add to correct sparse list, while avoiding dublicates
                     vs->sparseBuffer[count++] = vert;
-                    Bitmap_Set(vs->bitArray, vert);
+                    Bitmap_Set_Shifted(vs->bitBuffer, vert, indexShift, vs->size_bitarray);
                 }
             } else {
                 // update bitarray (without caring about sparse)
-                Bitmap_Set(vs->bitArray, vert);
+                Bitmap_Set_Shifted(vs->bitBuffer, vert, indexShift, vs->size_bitarray);
             }
         }
         // set correctly counted size
@@ -409,13 +410,14 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* const vs, const int VERT
             vs->sparseBuffer = temp;
             temp = NULL;        
         }
+    } else {
+        // filling shifted dense buffer
+        for (size_t i = 0; i < vs->size_bitarray; i++) {
+            vs->bitBuffer[i] = vs->bitArray[(i+indexShift) % vs->size_bitarray];
+        }
     }
 
-    // filling shifted dense buffer
-    int indexShift = blockIndices_input[vs->mpi_rank];
-    for (size_t i = 0; i < vs->size_bitarray; i++) {
-        vs->bitBuffer[i] = vs->bitArray[(i+indexShift) % vs->size_bitarray];
-    }
+
     // Attention: from now on bitBuffer holds data and bitArray is used as buffer
 
 
