@@ -18,7 +18,7 @@ typedef struct{
  * in each rank)
  * @return distributedGraph_CSR* graph
  */
-void createDistributedGraph(const tuple_graph* const tg, distributedGraph_CSR* const graph);
+void createDistributedGraph(const tuple_graph* const tg, distributedGraph_CSR* const graph, int64_t nglobalverts);
 
 /**
  * Prints neighbors of vertex "vertex"

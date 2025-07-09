@@ -2,30 +2,40 @@
 #include "csr_custom.h"
 #include <assert.h>
 
-void divideTuplegraph_divisible(tuple_graph* const tg){
+void divideTuplegraph_divisible(const tuple_graph* const tg, tuple_graph* const tg_split){
     // Assumption to work properly: rank 0 holds correct edge list
-	//								number of edges is devisible by size of COMM_WORLD
+	//								every rank knows the number of global edges
 
-	// distribute edges equally to the processes
-	uint64_t nlocaledges = tg->nglobaledges / size; // every process has correct nglobaledges
-												   // we assume number of ranks devide the edges as a whole
+	// Only works, if there are less than 2147483647 edges (2^32)
+	assert(tg->nglobaledges <= INT_MAX);
+
+	// find number of elements and displacements
+	int nlocaledges[size];
+	int offset[size+1];
+	offset[0] = 0;
+	for (size_t i = 1; i < size + 1; i++) {
+		offset[i] = i * tg->nglobaledges / size;
+		nlocaledges[i-1] = offset[i] - offset[i-1];
+	}
+
+	// Scatter edgelist amongst ranks
 	packed_edge* local_edges;
-	local_edges = (packed_edge*) malloc(sizeof(packed_edge) * nlocaledges);
-	MPI_Scatter(tg->edgememory,
-				nlocaledges,
-				packed_edge_mpi_type, // mpi_Type is already provided by framework
-				local_edges,
-				nlocaledges,
-				packed_edge_mpi_type,
-				0,  // rank 0 has all edges
-				MPI_COMM_WORLD);
-	tg->edgememory = local_edges;
-	tg->nlocaledeges = nlocaledges;				
+	local_edges = (packed_edge*) malloc(sizeof(packed_edge) * nlocaledges[rank]);
+	MPI_Scatterv(tg->edgememory, nlocaledges, offset,
+				packed_edge_mpi_type, local_edges, nlocaledges[rank],
+				packed_edge_mpi_type, 0, MPI_COMM_WORLD);
+	
+	// Set relevant info in new split variant
+	tg_split->edgememory = local_edges;
+	tg_split->nlocaledeges = nlocaledges[rank];
+	tg_split->nglobaledges = tg->nglobaledges;
+
+	// set to NULL for good measure ;)
+	local_edges = NULL;		
 }
 
-uint64_t* getVertexSpacing(const tuple_graph* const tg){
+uint64_t* getVertexSpacing(const tuple_graph* const tg, const uint64_t nglobalverts){
 	uint64_t* vertexCount;
-	uint64_t nglobalverts = tg->nglobaledges / 16; // needs to be calculated correctly
 	vertexCount = (uint64_t*) malloc((nglobalverts + 1) * sizeof(uint64_t));
 	
 	// initialize with 0
@@ -46,21 +56,19 @@ uint64_t* getVertexSpacing(const tuple_graph* const tg){
 		vertexCount[i] += vertexCount[i-1];
 	}
 
-	assert(vertexCount[nglobalverts] == 2*tg->nlocaledeges); // Error in counting the edges 
+	assert(vertexCount[nglobalverts] == 2*tg->nlocaledeges && "Error in counting the edges"); 
 	return vertexCount;
 
 }
 
-void setDataArray(const tuple_graph* const tg, distributedGraph_CSR* const graph){
+void setDataArray(const tuple_graph* const tg, distributedGraph_CSR* const graph, const int64_t nglobalverts){
 	uint32_t* vertexCount;
 	uint32_t* data;
 	uint32_t vertexOffset, vertex1, vertex2;
 	packed_edge edge;
-	
-	uint64_t nglobalverts = tg->nglobaledges / 16;
 
 	vertexCount = (uint32_t*) malloc(nglobalverts * sizeof(uint32_t));
-	data = (uint32_t*) malloc(graph->indices[nglobalverts-1] * sizeof(uint32_t));
+	data = (uint32_t*) malloc(graph->indices[nglobalverts] * sizeof(uint32_t));
 
 	// initialize with 0
 	for (uint32_t i = 0; i < nglobalverts; i++) {
@@ -95,30 +103,35 @@ void setDataArray(const tuple_graph* const tg, distributedGraph_CSR* const graph
 void printNeighbors(distributedGraph_CSR* const graph, uint32_t vertex, int checkRank){
 	packed_edge edge;
 	if (rank == checkRank) {
-		printf("Neighbours of vertex %ld (for rank %d):\n", vertex, rank);
+		printf("Neighbours of vertex %d (for rank %d):\n", vertex, rank);
 		for (uint64_t i = graph->indices[vertex]; i < graph->indices[vertex+1]; i++){
-			printf("%ld ", graph->data[i]);
+			printf("%d ", graph->data[i]);
 		}
 		printf("\n");
 	}
 }
 
-void createDistributedGraph(const tuple_graph* const tg, distributedGraph_CSR* const graph){
+void createDistributedGraph(const tuple_graph* const tg, distributedGraph_CSR* const graph, int64_t nglobalverts){
     // set nGlobaledges
 	graph->nGlobalEdges = tg->nglobaledges;
 
+
 	// set nGlobalVerts
-	graph->nGlobalVerts = tg->nglobaledges/16;
+	graph->nGlobalVerts = nglobalverts;
     
     // divide edges equally on threads
-    divideTuplegraph_divisible(tg);
+	tuple_graph tg_split;
+    divideTuplegraph_divisible(tg, &tg_split);
 	graph->nLocaledges = tg->nlocaledeges;
 
 	// get indices for each vertex
-	graph->indices = getVertexSpacing(tg);		
+	graph->indices = getVertexSpacing(&tg_split, nglobalverts);
 
 	// put in data
-	setDataArray(tg, graph);
+	setDataArray(&tg_split, graph, nglobalverts);
+
+	// free allocated memory from tg_split 
+	free(tg_split.edgememory);
 }
 /*
 void getNeighbours(distributedGraph_CSR* const graph, uint32_t vertex,  uint32_t *start, uint32_t *end){

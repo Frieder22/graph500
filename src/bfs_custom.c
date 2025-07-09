@@ -32,25 +32,9 @@ distributedGraph_CSR graph;
 //user should provide this function which would be called once to do kernel 1: graph convert
 void make_graph_data_structure(const tuple_graph* const tg) {
 	//graph conversion, can be changed by user by replacing oned_csr.{c,h} with new graph format
-	/*
-	*/
-	tuple_graph tg_copy;
-	packed_edge *edgebuff;
-	if (rank==0) {
-		edgebuff = (packed_edge*) malloc(sizeof(packed_edge) * tg->nglobaledges);
-		for (size_t i = 0; i < tg->nglobaledges; i++){
-			edgebuff[i] = tg->edgememory[i];
-		}
-	}
-	
-	tg_copy = *tg;
-	tg_copy.edgememory = edgebuff;
 
-	
 	convert_graph_to_oned_csr(tg, &g);
-	createDistributedGraph(&tg_copy, &graph);
-
-	free(edgebuff);	
+	createDistributedGraph(tg, &graph, g.nglobalverts -1);	
 }
 
 bool validate(int64_t root, int64_t *preds){
