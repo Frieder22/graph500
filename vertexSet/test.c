@@ -235,7 +235,8 @@ int main(int argc, char *argv[]){
         test_Allreduce(Vertexset_Allreduce_Exact_Halfing,1, 0.5);
         test_Allreduce(Vertexset_Allreduce_Exact_Halfing,63, 0.3);
         test_Allreduce(Vertexset_Allreduce_Exact_Halfing,64, 0.3);
-        test_Allreduce(Vertexset_Allreduce_Exact_Halfing,65, 0.3);
+        test_Allreduce(Vertexset_Allreduce_Exact_Halfing,65, 0.3);        
+        test_Allreduce(Vertexset_Allreduce_Exact_Halfing,1<<25, 0.3);        
     }
 
     // test_red_approxHalfing: test reduce 
@@ -246,6 +247,7 @@ int main(int argc, char *argv[]){
         test_Allreduce(Vertexset_Allreduce_Approximate_Halfing,63, 0.3);
         test_Allreduce(Vertexset_Allreduce_Approximate_Halfing,64, 0.3);
         test_Allreduce(Vertexset_Allreduce_Approximate_Halfing,65, 0.3);
+        test_Allreduce(Vertexset_Allreduce_Approximate_Halfing,1<<25, 0.3);
     }
 
     if (testNumber == 3){        
@@ -264,6 +266,7 @@ int main(int argc, char *argv[]){
         test_Allreduce(Vertexset_Allreduce_Dense,63, 0.3);
         test_Allreduce(Vertexset_Allreduce_Dense,64, 0.3);
         test_Allreduce(Vertexset_Allreduce_Dense,65, 0.3);
+        test_Allreduce(Vertexset_Allreduce_Dense,1<<25, 0.3);
     }
 
     MPI_Finalize();
