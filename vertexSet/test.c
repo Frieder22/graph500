@@ -18,6 +18,11 @@
 
 int rank, size;
 
+// from https://www.geeksforgeeks.org/qsort-function-in-c/
+// comparator for qsort to sort in ascending order
+int comp(const void *a, const void *b) {
+    return (*(int *)a - *(int *)b);
+};
 
 void test_Iterator_sparse(){
     printf("Testing Iterator sparse...\n");
@@ -60,11 +65,6 @@ void test_Iterator_sparse(){
 
     printf(ANSI_GREEN "Test Iterator Sparse SUCCESSFUL\n" ANSI_RESET);
     printf("--------------------------------------------\n\n");
-};
-
-// from https://www.geeksforgeeks.org/qsort-function-in-c/
-int comp(const void *a, const void *b) {
-    return (*(int *)a - *(int *)b);
 };
 
 void test_Iterator_dense(){
@@ -113,7 +113,7 @@ void test_Iterator_dense(){
     printf("--------------------------------------------\n\n");
 };
 
-void test_Allreduce(void (*reduceFunc) (Vertexset*, int), int setSize, float filling){
+bool test_Allreduce_single(void (*reduceFunc) (Vertexset*, int), int setSize, float filling){
     bool isCorrect = true;
     bool verbose = false;
 
@@ -209,7 +209,33 @@ void test_Allreduce(void (*reduceFunc) (Vertexset*, int), int setSize, float fil
             printf("--------------------------------------------\n\n");
         }        
     }
+
+    return isCorrect;
 }
+
+bool test_Allreduce_batch(void (*reduceFunc) (Vertexset*, int)){
+    bool isCorrect = true;
+    isCorrect &= test_Allreduce_single(reduceFunc, 1000000, 0.01);
+    isCorrect &= test_Allreduce_single(reduceFunc, 100, 1.0);
+    isCorrect &= test_Allreduce_single(reduceFunc, 1, 0.5);
+    isCorrect &= test_Allreduce_single(reduceFunc, 63, 0.3);
+    isCorrect &= test_Allreduce_single(reduceFunc, 64, 0.3);
+    isCorrect &= test_Allreduce_single(reduceFunc, 65, 0.3);
+    //isCorrect &= test_Allreduce_single(reduceFunc, 1<<25, 0.3);  
+    if (rank==0) {
+        if (isCorrect) {
+            printf(ANSI_GREEN"\n--------------------------------------------\n");
+            printf("|          All tests SUCCESSFUL            |\n");
+            printf("--------------------------------------------\n\n"ANSI_RESET);
+        } else {
+            printf(ANSI_RED"\n--------------------------------------------\n");
+            printf("|           Some test(s) FAILED            |\n");
+            printf("--------------------------------------------\n\n"ANSI_RESET);
+        }        
+    } 
+    return isCorrect;
+}
+
 
 
 int main(int argc, char *argv[]){
@@ -222,51 +248,31 @@ int main(int argc, char *argv[]){
     int testNumber = atoi(argv[1]);
     
     // test_it: test iterators
-    if (testNumber == 0){
-        test_Iterator_dense();
-        test_Iterator_sparse();
-    }
+    switch (testNumber) {
+        case 0: // Test iterator
+            test_Iterator_dense();
+            test_Iterator_sparse();
+            break;
+        
+        case 1: // Test Exact halfing
+            assert((size & (size - 1)) == 0); // only works for ranks = 2^k
+            test_Allreduce_batch(Vertexset_Allreduce_Exact_Halfing);
+            break;
 
-    // test_red_exactHalfing: test reduce 
-    if (testNumber == 1){
-        assert((size & (size - 1)) == 0); // only works for ranks = 2^k
-        test_Allreduce(Vertexset_Allreduce_Exact_Halfing,1000000, 0.01);
-        test_Allreduce(Vertexset_Allreduce_Exact_Halfing,100, 1.0);
-        test_Allreduce(Vertexset_Allreduce_Exact_Halfing,1, 0.5);
-        test_Allreduce(Vertexset_Allreduce_Exact_Halfing,63, 0.3);
-        test_Allreduce(Vertexset_Allreduce_Exact_Halfing,64, 0.3);
-        test_Allreduce(Vertexset_Allreduce_Exact_Halfing,65, 0.3);        
-        test_Allreduce(Vertexset_Allreduce_Exact_Halfing,1<<25, 0.3);        
-    }
+        case 2: // Test Approximate halfing
+            test_Allreduce_batch(Vertexset_Allreduce_Approximate_Halfing);
+            break;
 
-    // test_red_approxHalfing: test reduce 
-    if (testNumber == 2){        
-        test_Allreduce(Vertexset_Allreduce_Approximate_Halfing,1000000, 0.01);
-        test_Allreduce(Vertexset_Allreduce_Approximate_Halfing,100, 1.0);
-        test_Allreduce(Vertexset_Allreduce_Approximate_Halfing,1, 0.5);
-        test_Allreduce(Vertexset_Allreduce_Approximate_Halfing,63, 0.3);
-        test_Allreduce(Vertexset_Allreduce_Approximate_Halfing,64, 0.3);
-        test_Allreduce(Vertexset_Allreduce_Approximate_Halfing,65, 0.3);
-        test_Allreduce(Vertexset_Allreduce_Approximate_Halfing,1<<25, 0.3);
-    }
+        case 3: // Test allreduce using ring topology
+            test_Allreduce_batch(Vertexset_Allreduce_Ring_Comm);
+            break;
 
-    if (testNumber == 3){        
-        //test_Allreduce(Vertexset_Allreduce_Ring_Comm,1000000, 0.01);
-        test_Allreduce(Vertexset_Allreduce_Ring_Comm,260, 0.05);
-        //test_Allreduce(Vertexset_Allreduce_Ring_Comm,1, 0.5);
-        //test_Allreduce(Vertexset_Allreduce_Ring_Comm,63, 0.3);
-        //test_Allreduce(Vertexset_Allreduce_Ring_Comm,64, 0.3);
-        //test_Allreduce(Vertexset_Allreduce_Ring_Comm,65, 0.3);
-    }
+        case 4: // Test dense allreduce
+            test_Allreduce_batch(Vertexset_Allreduce_Dense);
+            break;
 
-    if (testNumber == 4){        
-        test_Allreduce(Vertexset_Allreduce_Dense,1000000, 0.01);
-        test_Allreduce(Vertexset_Allreduce_Dense,100, 1.0);
-        test_Allreduce(Vertexset_Allreduce_Dense,1, 0.5);
-        test_Allreduce(Vertexset_Allreduce_Dense,63, 0.3);
-        test_Allreduce(Vertexset_Allreduce_Dense,64, 0.3);
-        test_Allreduce(Vertexset_Allreduce_Dense,65, 0.3);
-        test_Allreduce(Vertexset_Allreduce_Dense,1<<25, 0.3);
+        default:
+            break;
     }
 
     MPI_Finalize();
