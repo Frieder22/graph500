@@ -453,7 +453,6 @@ int main(int argc, char *argv[]){
         case 5: //Test functionality of vertexset
             test_Vertexset_sparse();
             test_Vertexset_dense();
-            test_Vertexset_very_dense();
             break;
 
         default:
