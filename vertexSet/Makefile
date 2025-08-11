@@ -31,6 +31,9 @@ test_red_ringComm: test
 test_red_dense: test
 	mpirun -np 4 ./$(build)/test.o 4
 
+test_vertexset: test
+	mpirun -np 1 ./$(build)/test.o 5
+
 perf: performance.c
 	$(GCC) $(CFLAGS) -o $(build)/perf.o performance.c $(SOURCES)
 

@@ -236,6 +236,185 @@ bool test_Allreduce_batch(void (*reduceFunc) (Vertexset*, int)){
     return isCorrect;
 }
 
+bool test_Vertexset_sparse(){
+    bool isCorrect = true;
+    int maxsize = 500;
+    const int n1 = 15;
+    const int n2 = 7;
+    srand(42);
+
+    // Init of VS
+    Vertexset vs;
+    Vertexset_Init(&vs, maxsize, MPI_COMM_WORLD);
+    
+    // reference buffer
+    uint32_t added[n1 + n2];
+    uint32_t vert;
+
+    // PART 1
+    // Add random verts
+    for (size_t i = 0; i < n1; i++) {
+        vert = rand() % maxsize;
+
+        // add in reference
+        added[i] = vert;
+        // add in VS
+        Vertexset_Add(&vs, vert);
+    }
+    
+    // Check for correct insertions
+    for (size_t i = 0; i < n1; i++) {
+        isCorrect &= (added[i] == vs.sparseArray[i]);
+    }
+    isCorrect &= (n1 == vs.sizeSparse);  // correct size
+
+    // PART 2
+    // Add more random verts
+    for (size_t i = 0; i < n2; i++) {
+        vert = rand() % maxsize;
+
+        // add in reference
+        added[n1 + i] = vert;
+        // add in VS
+        Vertexset_Add(&vs, vert);
+    }
+
+    // Check for correct insertions
+    for (size_t i = 0; i < n1 + n2; i++) {
+        isCorrect &= (added[i] == vs.sparseArray[i]);
+    }
+    isCorrect &= (n1 + n2 == vs.sizeSparse);  // correct size
+
+    // Part 3
+    // Check, if contains finds all inserted values
+    for (size_t i = 0; i < n1 + n2; i++) {
+        isCorrect &= Vertexset_Contains(&vs, added[i]);
+    }
+    
+    // Check, if contains finds no missing values
+    uint32_t complement[maxsize];
+    for (size_t i = 0; i < maxsize; i++){
+        complement[i] = i;
+    }
+    for (size_t i = 0; i < n1+n2; i++) {
+        complement[added[i]] = maxsize; // mark already added vals
+    }
+    for (size_t i = 0; i < maxsize; i++) {
+        vert = complement[i];
+        if (vert != maxsize) {
+            isCorrect &= (!Vertexset_Contains(&vs, vert));
+        }
+    }
+    
+    // Part 4
+    // Check Cleanup
+    Vertexset_Clean(&vs);
+    isCorrect &= (vs.sizeSparse == 0);
+    
+    // Free Vertexset
+    Vertexset_Deinit(&vs);
+
+    // result output
+    if (isCorrect) {
+        printf(ANSI_GREEN "Test Vertexset_sparse SUCCESSFUL\n" ANSI_RESET);
+        printf("--------------------------------------------\n\n");
+    } else {
+        printf(ANSI_RED "Test Vertexset_sparse FAILED\n" ANSI_RESET );
+        printf("--------------------------------------------\n\n");
+    }
+}
+
+bool test_Vertexset_dense(){
+    bool isCorrect = true;
+    int maxsize = 257;
+
+    // Init of VS
+    Vertexset vs;
+    Vertexset_Init(&vs, maxsize, MPI_COMM_WORLD);
+
+    // set to dense
+    vs.isdense = 1;
+
+    // clean VS
+    Vertexset_Clean(&vs);
+    
+    // PART 1
+    // Check Bitarray to be empty
+    int nwords = vs.size_bitarray;
+    for (size_t i = 0; i < nwords; i++) {
+        isCorrect &= (vs.bitArray[i] == 0ULL);
+    }
+
+    // PART 2
+    // Add a few numbers in VS, that are in the first word
+    uint32_t verts[] = {1, 20, 3, 7, 63};
+
+    unsigned long long word = 0ULL;
+    for (size_t i = 0; i < sizeof(verts)/sizeof(uint32_t); i++) {
+        // find correct word  
+        word += 1ULL << verts[i];
+        //add to VS
+        Vertexset_Add(&vs, verts[i]);
+    }
+    isCorrect &= (word == vs.bitArray[0]);
+
+    // PART 3
+    // Add a few numbers in VS, that are in the second word
+    uint32_t verts2[] = {65, 80, 100, 77, 111};
+
+    unsigned long long word2 = 0ULL;
+    for (size_t i = 0; i < sizeof(verts2)/sizeof(uint32_t); i++) {
+        // find correct word
+        word2 += 1ULL << (verts2[i] - ulong_bits);
+        //add to VS
+        Vertexset_Add(&vs, verts2[i]);
+    }
+    isCorrect &= (word2 == vs.bitArray[1]);
+    // Check, if word 1 is unaltered
+    isCorrect &= (word == vs.bitArray[0]);
+
+    // PART 4:
+    // Check correct allocation size for bitarray
+    if (maxsize % ulong_bits == 0) {
+        isCorrect &= (vs.size_bitarray == maxsize/ulong_bits);
+    } else {
+        isCorrect &= (vs.size_bitarray == maxsize/ulong_bits + 1);
+    }
+
+    // PART 5
+    // check for correct contains functionality
+    Vertexset_Add(&vs, maxsize - 1); // add edge cases
+    Vertexset_Add(&vs, 0); // add edge cases
+    bool isInSet;
+    for (uint32_t vert = 0; vert < maxsize; vert++) {
+        isInSet = false;
+        for (size_t i = 0; i < sizeof(verts)/sizeof(uint32_t); i++) {
+            isInSet |= (verts[i] == vert);
+        }
+        for (size_t i = 0; i < sizeof(verts2)/sizeof(uint32_t); i++) {
+            isInSet |= (verts2[i] == vert);
+        }
+        isInSet |= (vert == 0);
+        isInSet |= (vert == maxsize - 1);
+        isCorrect &= (isInSet == Vertexset_Contains(&vs, vert));
+    }
+    
+    // PART 6
+    // Check again Bitarray to be empty
+    Vertexset_Clean(&vs);
+    for (size_t i = 0; i < nwords; i++) {
+        isCorrect &= (vs.bitArray[i] == 0ULL);
+    }
+
+    // result output
+    if (isCorrect) {
+        printf(ANSI_GREEN "Test Vertexset_dense SUCCESSFUL\n" ANSI_RESET);
+        printf("--------------------------------------------\n\n");
+    } else {
+        printf(ANSI_RED "Test Vertexset_dense FAILED\n" ANSI_RESET );
+        printf("--------------------------------------------\n\n");
+    }
+}
 
 
 int main(int argc, char *argv[]){
@@ -269,6 +448,12 @@ int main(int argc, char *argv[]){
 
         case 4: // Test dense allreduce
             test_Allreduce_batch(Vertexset_Allreduce_Dense);
+            break;
+
+        case 5: //Test functionality of vertexset
+            test_Vertexset_sparse();
+            test_Vertexset_dense();
+            test_Vertexset_very_dense();
             break;
 
         default:
