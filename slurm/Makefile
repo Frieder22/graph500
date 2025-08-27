@@ -40,6 +40,9 @@ copy_to_cluster:
 	scp -r ../vertexSet/ hydra:~/.
 	scp -r ../slurm hydra:~/.
 
+run: copy_to_cluster
+	ssh -t hydra 'bash --login -i -c "spack load openmpi@4.1.6 && cd slurm && make test_red_exactHalfing"'
+
 copy_from_cluster:
 	scp -r hydra:~/data/ ../
 
