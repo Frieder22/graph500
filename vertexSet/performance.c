@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 
 // for colored text output
@@ -18,36 +19,60 @@
 #define ANSI_RESET   "\x1b[0m"
 
 #define OUTPUTPATH "../data/performanceData/"
-#define N_DATAPOINTS 10
+#define N_DATAPOINTS 20
 #define SETSIZE 500000
 #define SETFILLING 0.1
 
 int rank, size;
+
+void fillInFunctionName(char* filepath, void (*reduceFunc) (Vertexset*, int)){
+    if (reduceFunc == Vertexset_Allreduce_Exact_Halfing) {
+        char filename[] = "exact_Halfing";
+        strcat(filepath, filename);
+    } else if (reduceFunc == Vertexset_Allreduce_Approximate_Halfing) {
+        char filename[] = "approx_Halfing";
+        strcat(filepath, filename);
+    } else if (reduceFunc == Vertexset_Allreduce_Ring_Comm) {
+        char filename[] = "ring_Comm";
+        strcat(filepath, filename);
+    } else if (reduceFunc == Vertexset_Allreduce_Dense) {
+        char filename[] = "dense";
+        strcat(filepath, filename);
+    } else {
+        printf(ANSI_RED "Performance testing for this function is not implemented!\n" ANSI_RESET);
+        return;
+    }
+}
+
+void fillInClusterConfig(char* filepath){
+    // get the number of nodes via the enviroment viarable (provided by slurm)
+    char *N_Nodes = getenv("SLURM_NNODES");
+    // same for tasks per node
+    char *N_TasksPerNode = getenv("SLURM_NTASKS_PER_NODE");
+    
+    // assume enviroment variables are only set by slurm
+    if (N_Nodes){
+        strcat(filepath, "_");
+        strcat(filepath, N_Nodes);
+        strcat(filepath, "x");
+        strcat(filepath, N_TasksPerNode);
+    } else {
+        // identifier for local produced data
+        strcat(filepath, "_local");
+    }
+}
 
 void performance_sizeSeries(void (*reduceFunc) (Vertexset*, int), float filling){
     double performance[3];
     // Set up file IO 
     FILE *f;
     if (rank==0){
-        char filepath[100] = OUTPUTPATH;
+        char filepath[1000] = OUTPUTPATH;
         char fillingStr[20]; 
         sprintf(fillingStr, "_%f", filling);
-        if (reduceFunc == Vertexset_Allreduce_Exact_Halfing) {
-            char filename[] = "exact_Halfing";
-            strcat(filepath, filename);
-        } else if (reduceFunc == Vertexset_Allreduce_Approximate_Halfing) {
-            char filename[] = "approx_Halfing";
-            strcat(filepath, filename);
-        } else if (reduceFunc == Vertexset_Allreduce_Ring_Comm) {
-            char filename[] = "ring_Comm";
-            strcat(filepath, filename);
-        } else if (reduceFunc == Vertexset_Allreduce_Dense) {
-            char filename[] = "dense";
-            strcat(filepath, filename);
-        } else {
-            printf(ANSI_RED "Performance testing for this function is not implemented!\n" ANSI_RESET);
-            return;
-        }
+
+        fillInFunctionName(filepath, reduceFunc);
+        fillInClusterConfig(filepath);
 
         strcat(filepath, "_sizeSeries");
         strcat(filepath, fillingStr);
@@ -190,25 +215,12 @@ void performance_fillingSeries(void (*reduceFunc) (Vertexset*, int), int setSize
     double performance[3];
     FILE *f;
     if (rank==0){
-        char filepath[100] = OUTPUTPATH;
+        char filepath[1000] = OUTPUTPATH;
         char setSizeStr[20]; 
         sprintf(setSizeStr, "_%d", setSize);
-        if (reduceFunc == Vertexset_Allreduce_Exact_Halfing) {
-            char filename[] = "exact_Halfing";
-            strcat(filepath, filename);
-        } else if (reduceFunc == Vertexset_Allreduce_Approximate_Halfing) {
-            char filename[] = "approx_Halfing";
-            strcat(filepath, filename);
-        } else if (reduceFunc == Vertexset_Allreduce_Ring_Comm) {
-            char filename[] = "ring_Comm";
-            strcat(filepath, filename);
-        } else if (reduceFunc == Vertexset_Allreduce_Dense) {
-            char filename[] = "dense";
-            strcat(filepath, filename);
-        } else {
-            printf(ANSI_RED "Performance testing for this function is not implemented!\n" ANSI_RESET);
-            return;
-        }
+
+        fillInFunctionName(filepath, reduceFunc);
+        fillInClusterConfig(filepath);
 
         strcat(filepath, "_fillingSeries");
         strcat(filepath, setSizeStr);
@@ -225,7 +237,7 @@ void performance_fillingSeries(void (*reduceFunc) (Vertexset*, int), int setSize
     }
 
     // Definition of testing range
-    float fillings[] = {0.005, 0.01, 0.02, 0.03, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35}; //, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95};
+    float fillings[] = {0.005, 0.01, 0.02, 0.03, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95};
     int N = sizeof(fillings) / sizeof(float);
 
 
