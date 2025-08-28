@@ -17,12 +17,58 @@
 #define ANSI_RESET   "\x1b[0m"
 
 int rank, size;
+char *N_Nodes, *N_TasksPerNode;
+
+enum Testcase{
+    ITERATOR,
+    EXACT_HALFING,
+    APROXIMATE_HALFING,
+    RING_TOPO,
+    DENSE,
+    VERTEXSET_TEST
+};
 
 // from https://www.geeksforgeeks.org/qsort-function-in-c/
 // comparator for qsort to sort in ascending order
 int comp(const void *a, const void *b) {
     return (*(int *)a - *(int *)b);
 };
+
+void printTestInfo(int testnumber){
+    if(rank==0){
+        printf("\n");
+        switch (testnumber) {
+        case ITERATOR:
+            printf("Testing functionality of Iterator functions.\n");
+            break;
+        case EXACT_HALFING:
+            printf("Testing functionality of Exact Halfing Reduce.\n");
+            break;
+        case APROXIMATE_HALFING:
+            printf("Testing functionality of Aproximate Halfing Reduce.\n");
+            break;
+        case RING_TOPO:
+            printf("Testing functionality of Ring Topology Reduce.\n");
+            break;
+        case DENSE:
+            printf("Testing functionality of Dense Reduce.\n");
+            break;
+        case VERTEXSET_TEST:
+            printf("Testing functionality of Vertexset functions.\n");
+            break;
+        
+        default:
+            printf(ANSI_RED "Print function doesn't know this testcase!\n" ANSI_RESET);
+            break;
+        }
+        if (N_Nodes) {
+            printf("Using %s nodes with %s processes on each node (%d ranks).\n", N_Nodes, N_TasksPerNode, size);
+        } else {
+            printf("Using %d processes on one machine.\n", size);
+        }
+        printf("\n");
+    }
+}
 
 void test_Iterator_sparse(){
     printf("Testing Iterator sparse...\n");
@@ -425,32 +471,38 @@ int main(int argc, char *argv[]){
 
     assert(argc == 2);
     int testNumber = atoi(argv[1]);
-    
+    // get the number of nodes via the enviroment viarable (provided by slurm)
+    N_Nodes = (char*) getenv("SLURM_NNODES");
+    // same for tasks per node
+    N_TasksPerNode = (char*) getenv("SLURM_NTASKS_PER_NODE");
+
+    printTestInfo(testNumber);
+
     // test_it: test iterators
     switch (testNumber) {
-        case 0: // Test iterator
+        case ITERATOR: // Test iterator
             test_Iterator_dense();
             test_Iterator_sparse();
             break;
         
-        case 1: // Test Exact halfing
+        case EXACT_HALFING: // Test Exact halfing
             assert((size & (size - 1)) == 0); // only works for ranks = 2^k
             test_Allreduce_batch(Vertexset_Allreduce_Exact_Halfing);
             break;
 
-        case 2: // Test Approximate halfing
+        case APROXIMATE_HALFING: // Test Approximate halfing
             test_Allreduce_batch(Vertexset_Allreduce_Approximate_Halfing);
             break;
 
-        case 3: // Test allreduce using ring topology
+        case RING_TOPO: // Test allreduce using ring topology
             test_Allreduce_batch(Vertexset_Allreduce_Ring_Comm);
             break;
 
-        case 4: // Test dense allreduce
+        case DENSE: // Test dense allreduce
             test_Allreduce_batch(Vertexset_Allreduce_Dense);
             break;
 
-        case 5: //Test functionality of vertexset
+        case VERTEXSET_TEST: //Test functionality of vertexset
             test_Vertexset_sparse();
             test_Vertexset_dense();
             break;
