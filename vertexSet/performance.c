@@ -1,6 +1,7 @@
 #include "vertexSet.h"
 #include "vertexSetIterator.h"
 #include "mpi.h"
+#include "testStructure.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,6 +25,7 @@
 #define SETFILLING 0.1
 
 int rank, size;
+extern enum Testcase Testcase;
 
 void fillInFunctionName(char* filepath, void (*reduceFunc) (Vertexset*, int)){
     if (reduceFunc == Vertexset_Allreduce_Exact_Halfing) {
@@ -366,8 +368,9 @@ int main(int argc, char *argv[]){
     int testNumber = atoi(argv[1]);
     
 
+    switch (testNumber) {
     // perf_red_exactHalfing: measure performance of allreduce 
-    if (testNumber == 0){
+    case EXACT_HALFING:
         if (rank==0) {
             printf("-------------------------------------------------------------\n");
             printf("Testing performance of Vertexset_Allreduce_Exact_Halfing...\n");
@@ -375,14 +378,20 @@ int main(int argc, char *argv[]){
         }
         performance_sizeSeries(Vertexset_Allreduce_Exact_Halfing, SETFILLING);
         performance_fillingSeries(Vertexset_Allreduce_Exact_Halfing, SETSIZE);
-    }
+        break;
 
     // perf_red_approxHalfing: measure performance of allreduce 
-    if (testNumber == 1){
+    case APROXIMATE_HALFING:
+        if (rank==0) {
+            printf("-------------------------------------------------------------\n");
+            printf("Testing performance of Vertexset_Allreduce_Approximate_Halfing...\n");
+            printf("-------------------------------------------------------------\n");
+        }        
         performance_sizeSeries(Vertexset_Allreduce_Approximate_Halfing, SETFILLING);
-    }
+        break;
 
-    if (testNumber == 2){
+    // measure peprformance of ring comm reduce
+    case RING_TOPO:
         if (rank==0) {
             printf("-------------------------------------------------------------\n");
             printf("Testing performance of Vertexset_Allreduce_Ring_Comm...\n");
@@ -390,9 +399,10 @@ int main(int argc, char *argv[]){
         }
         performance_sizeSeries(Vertexset_Allreduce_Ring_Comm, SETFILLING);
         performance_fillingSeries(Vertexset_Allreduce_Ring_Comm, SETSIZE);
-    }
+        break;
 
-    if (testNumber == 3){
+    // measure peprformance of dense reduce
+    case DENSE:
         if (rank==0) {
             printf("-------------------------------------------------------------\n");
             printf("Testing performance of Vertexset_Allreduce_Dense...\n");
@@ -400,7 +410,12 @@ int main(int argc, char *argv[]){
         }
         performance_sizeSeries(Vertexset_Allreduce_Dense, SETFILLING);
         performance_fillingSeries(Vertexset_Allreduce_Dense, SETSIZE);
+        break;
+
+    default:
+        break;
     }
+
     MPI_Finalize();
     return 0;
 }

@@ -1,0 +1,16 @@
+#if !defined(TESTSTRUCTURE)
+#define TESTSTRUCTURE
+
+enum Testcase{
+    ITERATOR,
+    EXACT_HALFING,
+    APROXIMATE_HALFING,
+    RING_TOPO,
+    DENSE,
+    VERTEXSET_TEST
+};
+
+
+
+#endif // TESTSTRUCTURE
+

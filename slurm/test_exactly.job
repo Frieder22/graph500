@@ -1,7 +1,0 @@
-#! /bin/bash
-#SBATCH -p q_thesis
-#SBATCH -N 4                  # number of nodes nodes
-#SBATCH --ntasks-per-node=32   # processes per node
-#SBATCH --cpu-freq=High       # set CPU frequency to maximum
-#SBATCH --time=3:00           # max runtime
-srun ../build/test.o 1

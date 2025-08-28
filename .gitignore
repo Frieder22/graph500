@@ -4,3 +4,5 @@ src/graph500_*
 /build/*
 /data/*
 *.o
+slurm/default.config
+slurm/run.job

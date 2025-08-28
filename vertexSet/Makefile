@@ -3,7 +3,7 @@ CFLAGS = -O3 -I.
 
 target = main
 SOURCES = vertexSet.c vertexSetIterator.c
-HEADERS = vertexSet.h bitmap_custom.h vertexSetIterator.h
+HEADERS = vertexSet.h bitmap_custom.h vertexSetIterator.h testStructure.h
  
 build = ../build
 

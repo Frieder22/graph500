@@ -1,10 +1,10 @@
 #include "vertexSet.h"
 #include "vertexSetIterator.h"
 #include "mpi.h"
+#include "testStructure.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-
 
 // for colored text output
 // from https://stackoverflow.com/questions/3219393/stdlib-and-colored-output-in-c
@@ -19,14 +19,7 @@
 int rank, size;
 char *N_Nodes, *N_TasksPerNode;
 
-enum Testcase{
-    ITERATOR,
-    EXACT_HALFING,
-    APROXIMATE_HALFING,
-    RING_TOPO,
-    DENSE,
-    VERTEXSET_TEST
-};
+extern enum Testcase Testcase;
 
 // from https://www.geeksforgeeks.org/qsort-function-in-c/
 // comparator for qsort to sort in ascending order
