@@ -35,11 +35,11 @@ if args.func not in funcs_selection:
     print("Argparse error: The functionality (func) '" + args.func + "' is not in " + str(funcs_selection))
     sys.exit()
 
-if not (args.nNodes > 0 or args.nNodes <= 36):
+if not (args.nNodes > 0 and args.nNodes <= 36):
     print("Argparse error: The number of nodes (nNodes) '" + args.func + "' is not between 0 and 37. The hydra cluster has only 36 nodes available.")
     sys.exit()
 
-if not (args.perNode > 0 or args.perNode <= 32):
+if not (args.perNode > 0 and args.perNode <= 32):
     print("Argparse error: The number of processers per node (perNode) '" + args.func + "' is not between 0 and 33. The hydra cluster has only nodes with 32 cores each.")
     sys.exit()
 
