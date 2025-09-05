@@ -12,6 +12,7 @@ typedef struct Vertexset{
     size_t maxsize;
     size_t sizeCrit;
     bool isdense;
+    bool approx_halfing;
     
     // Data for Bitarray
     unsigned long long *bitArray;
@@ -29,6 +30,13 @@ typedef struct Vertexset{
     MPI_Comm MPI_COMM;
     int mpi_rank;
     int mpi_size;
+
+    // block informations
+    int *block_Indices;
+    int *block_nElements;
+
+    // index shift for approx_halfing
+    int indexShift;
 } Vertexset;
 
 /**

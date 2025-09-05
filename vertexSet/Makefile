@@ -23,7 +23,7 @@ test_red_exactHalfing: test
 	mpirun -np 4 ./$(build)/test.o 1
 
 test_red_approxHalfing: test
-	mpirun -np 4 ./$(build)/test.o 2
+	mpirun -np 3 ./$(build)/test.o 2
 
 test_red_ringComm: test
 	mpirun -np 4 ./$(build)/test.o 3
