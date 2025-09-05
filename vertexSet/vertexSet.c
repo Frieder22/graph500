@@ -61,10 +61,13 @@ void Vertexset_Init(Vertexset* const vs, const uint32_t maxsize, const MPI_Comm 
     if (vs->approx_halfing) {
         // calculate start and end of each block
         int blockIndices_input[vs->mpi_size + 1];
-        int blockIndices_buffer[vs->mpi_size + 1];
         int block_nElements_input[vs->mpi_size];
-        int block_nElements_buffer[vs->mpi_size];
         
+        int *blockIndices_buffer, *block_nElements_buffer;
+        
+        blockIndices_buffer = (int*) malloc(sizeof(int)*(vs->mpi_size + 1));
+        block_nElements_buffer = (int*) malloc(sizeof(int)* (vs->mpi_size));
+
         // calculate indices for input (same for every thread)
         blockIndices_input[0] = 0;
         for (size_t i = 1; i < vs->mpi_size + 1; i++) {
@@ -538,7 +541,7 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* const vs, const int VERT
         return;
     }
 
-    return;
+
     // do allGather
     for (int i=0; i < iterations; i++)  {
         // find shifts
@@ -554,7 +557,6 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* const vs, const int VERT
                      vs->bitArray + vs->block_Indices[shift], recvCount, MPI_UNSIGNED_LONG_LONG, recvNeighbor,101,
                      vs->MPI_COMM, MPI_STATUS_IGNORE);
     }
-    
     vs->isdense = true;
 };
 
