@@ -19,6 +19,9 @@ test: test.c $(SOURCES) $(HEADERS)
 test_it: test
 	mpirun -np 1 ./$(build)/test.o 0
 
+test_it_shifted: test
+	mpirun -np 3 ./$(build)/test.o 0
+
 test_red_exactHalfing: test
 	mpirun -np 4 ./$(build)/test.o 1
 
