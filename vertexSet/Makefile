@@ -41,16 +41,16 @@ perf: performance.c
 	$(GCC) $(CFLAGS) -o $(build)/perf.o performance.c $(SOURCES)
 
 perf_red_exactHalfing: perf
-	mpirun -np 4 ./$(build)/perf.o 0
-
-perf_red_approxHalfing: perf
 	mpirun -np 4 ./$(build)/perf.o 1
 
+perf_red_approxHalfing: perf
+	mpirun -np 3 ./$(build)/perf.o 2
+
 perf_red_ringComm: perf
-	mpirun -np 4 ./$(build)/perf.o 2
+	mpirun -np 4 ./$(build)/perf.o 3
 
 perf_red_dense: perf
-	mpirun -np 4 ./$(build)/perf.o 3
+	mpirun -np 4 ./$(build)/perf.o 4
 
 clean:
 	rm -rf ../build
