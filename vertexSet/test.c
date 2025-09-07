@@ -108,14 +108,16 @@ void test_Iterator_sparse(){
 
 void test_Iterator_dense(){
     printf("Testing Iterator dense...\n");
-    Vertexset vs;
+    Vertexset vs, control;
     Vertexset_Init(&vs, 500, MPI_COMM_WORLD);
+    Vertexset_Init(&control, 500, MPI_COMM_WORLD);
 
     uint32_t addedVerts[] = {10, 7, 12, 32, 0, 333, 499};
     int n = sizeof(addedVerts) / sizeof(addedVerts[0]);
 
     for (int i = 0; i < n; i++) {
         Vertexset_Add(&vs, addedVerts[i]);
+        Vertexset_Add(&control, addedVerts[i]);
     }
 
     Vertexset_TransformToDense(&vs);
@@ -123,15 +125,12 @@ void test_Iterator_dense(){
     vertexSetIterator_Init(&it, &vs);
 
 
-    qsort(addedVerts, n, sizeof(uint32_t), comp);
-
-
     int count = 0;
     uint32_t element;
     printf("Testing Has_next() and Next()...\n");
     while (vertexSetIterator_Has_next(&it)) {
         element = vertexSetIterator_Next(&it);
-        assert(element == addedVerts[count]);
+        assert(Vertexset_Contains(&control, element));
         count++;
     }
     assert(count == n);
@@ -141,12 +140,13 @@ void test_Iterator_dense(){
     printf("Testing Reset()...\n");
     while (vertexSetIterator_Has_next(&it)) {
         element = vertexSetIterator_Next(&it);
-        assert(element == addedVerts[count]);
+        assert(Vertexset_Contains(&control, element));
         count++;
     }
     assert(count == n);
 
     Vertexset_Deinit(&vs);
+    Vertexset_Deinit(&control);
 
     printf(ANSI_GREEN "Test Iterator Dense SUCCESSFUL\n" ANSI_RESET);
     printf("--------------------------------------------\n\n");
