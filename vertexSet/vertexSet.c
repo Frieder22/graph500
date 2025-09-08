@@ -703,7 +703,7 @@ void Vertexset_Allreduce_Ring_Comm(Vertexset* const vs, const int VERTEXSET_OPER
 void Vertexset_Allreduce_Dense(Vertexset* const vs, const int VERTEXSET_OPERATION){
     assert(VERTEXSET_OPERATION == VERTEXSET_OR); // no other operator implemented
     assert((vs->mpi_size & (vs->mpi_size - 1)) == 0); // communicator must be size of 2^k
-    //assert(vs->isdense);
+    assert(vs->isdense);
 
     // find block indices
     int blockIdx[vs->mpi_size + 1];

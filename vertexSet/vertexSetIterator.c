@@ -54,9 +54,9 @@ bool vertexSetIterator_Has_next(vertexSetIterator* const it){
             return false;
         } else {
             for ( size_t wordIdx = it->wordIdx; wordIdx < it->vs->size_bitarray; wordIdx++){
-                int i = (wordIdx - it->vs->indexShift + it->vs->size_bitarray) % it->vs->size_bitarray;
+                int wordIdx_shifted = (wordIdx - it->vs->indexShift + it->vs->size_bitarray) % it->vs->size_bitarray;
                 // find a word thats not 0
-                if (it->vs->bitArray[i] != 0ULL){
+                if (it->vs->bitArray[wordIdx_shifted] != 0ULL){
                     // find the 1s in the word
                     for (int j = it->wordShift; j < ulong_bits; j++) {
                         if (it->word &1UL == 1) { //found a 1
@@ -75,7 +75,7 @@ bool vertexSetIterator_Has_next(vertexSetIterator* const it){
                 }
                 it->wordIdx = wordIdx + 1;
                 it->wordShift = 0;
-                it->word = it->vs->bitArray[(i+1)%it->vs->size_bitarray];
+                it->word = it->vs->bitArray[(wordIdx_shifted+1)%it->vs->size_bitarray];
             }
             return false;
         }
