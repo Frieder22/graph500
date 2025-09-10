@@ -18,7 +18,6 @@ static inline int Vertexset_Log2_floor(int x){
     return i;
 };
 
-
 void Vertexset_Init(Vertexset* const vs, const uint32_t maxsize, const MPI_Comm MPI_COMM){
     vs->maxsize = maxsize;
     
@@ -202,7 +201,6 @@ void Vertexset_Allreduce(Vertexset* const vs, const int VERTEXSET_OP){
     // use only sparse communication
     assert(false && "Automatic algorithm selection is not implemented");
 }
-
 
 void Vertexset_Allreduce_Pure(Vertexset* const vs, const int VERTEXSET_OPERATION){
     assert(VERTEXSET_OPERATION == VERTEXSET_OR); //no other version is implemented
@@ -400,7 +398,6 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* const vs, const int VERTEXSET_
     vs->isdense = true;
 };
 
-
 void Vertexset_Allreduce_Approximate_Halfing(Vertexset* const vs, const int VERTEXSET_OPERATION) {
     assert(VERTEXSET_OPERATION == VERTEXSET_OR); //no other version is implemented
     assert(vs->approx_halfing);  //works only for shifted entries
@@ -421,6 +418,31 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* const vs, const int VERT
     int skipSequence[iterations + 1];
     skipSequence[iterations] = vs->mpi_size;
     
+    // prepare if sparse
+    if(!vs->isdense){
+        int countTrue = 0;
+        uint32_t vert;
+        // fill buffer with unique values and safe values in bitarray
+        for (size_t i = 0; i < vs->sizeSparse; i++) {
+            vert = vs->sparseArray[i];
+            if (!Bitmap_Test_Shifted(vs->bitArray, vert, vs->indexShift, vs->size_bitarray)) {
+                // insert in buffer
+                vs->sparseBuffer[countTrue++] = vert;
+
+                // insert in bitmap 
+                Bitmap_Set_Shifted(vs->bitArray, vert, vs->indexShift, vs->size_bitarray);
+            }
+        }
+        // set new sparse size
+        vs->sizeSparse = countTrue;
+
+        // switch buffer and array
+        uint32_t *temp;
+        temp = vs->sparseArray;
+        vs->sparseArray = vs->sparseBuffer;
+        vs->sparseBuffer = temp;
+        temp = NULL;        
+    }
 
     // do reduce_scatter
     int sendNeighbor;
@@ -470,20 +492,24 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* const vs, const int VERT
             MPI_Get_count(&status, MPI_INT32_T, &recvCount);
             
             if (!vs->isdense) {
-                MPI_Recv(vs->sparseArray + vs->sizeSparse, recvCount, MPI_INT32_T, recvNeighbor, 100, vs->MPI_COMM, MPI_STATUS_IGNORE);
-                vs->sizeSparse += recvCount;
+                MPI_Recv(vs->sparseBuffer, recvCount, MPI_INT32_T, recvNeighbor, 100, vs->MPI_COMM, MPI_STATUS_IGNORE);
+                uint32_t vert;
 
-                // transform to dense, if too big
-                if (vs->sizeSparse > vs->sizeCrit) {
-                    uint32_t vertex;
-                    Bitmap_Clean(vs->bitArray, vs->size_bitarray);
-                    for (size_t i = 0; i < vs->sizeSparse; i++){
-                        vertex = vs->sparseArray[i];
-                        Bitmap_Set_Shifted(vs->bitArray, vertex, vs->indexShift, vs->size_bitarray);
+                // fill buffer with unique values and safe values in bitarray
+                for (size_t i = 0; i < recvCount; i++) {
+                    vert = vs->sparseBuffer[i];
+                    if (!Bitmap_Test_Shifted(vs->bitArray, vert, vs->indexShift, vs->size_bitarray)) {
+                        // insert in buffer
+                        vs->sparseArray[vs->sizeSparse++] = vert;
+
+                        // insert in bitmap 
+                        Bitmap_Set_Shifted(vs->bitArray, vert, vs->indexShift, vs->size_bitarray);
                     }
+                }
+                if (vs->sizeSparse > criticalSize) {
                     vs->isdense = true;
                 }
-            
+                
             } else {
                 // fill into dense format
                 MPI_Recv(vs->sparseBuffer, recvCount, MPI_INT32_T, recvNeighbor, 100, vs->MPI_COMM, MPI_STATUS_IGNORE);
@@ -499,36 +525,17 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* const vs, const int VERT
             // dense array is recieved          
             // get length of message (can be done explicitly)
             recvCount = vs->block_Indices[shift_old - shift];
-            
-            // choose reduction style depenmding on set state (dense/sparse)            
-            if (vs->isdense) {
-                // Recieve into buffer.
-                MPI_Recv(vs->bitBuffer, recvCount, MPI_UNSIGNED_LONG_LONG, recvNeighbor, 200, vs->MPI_COMM, MPI_STATUS_IGNORE);
+            // Recieve into buffer.
+            MPI_Recv(vs->bitBuffer, recvCount, MPI_UNSIGNED_LONG_LONG, recvNeighbor, 200, vs->MPI_COMM, MPI_STATUS_IGNORE);
 
-                // Wait until send buffer message is safe
-                MPI_Wait(&req, MPI_STATUS_IGNORE);
+            // Wait until send buffer message is safe
+            MPI_Wait(&req, MPI_STATUS_IGNORE);
 
-                // do reduction           
-                for (int i = 0; i < recvCount; i++) {
-                    vs->bitArray[i] |= vs->bitBuffer[i];
-                }
-            } else {
-                // own set is sparse
-                // recieve directly into main bitarray (no buffering is needed)
-                // also we can assume the memory of the bitarrays is 0 everywhere.
-                Bitmap_Clean(vs->bitArray, vs->size_bitarray);
-                MPI_Recv(vs->bitArray, recvCount, MPI_UNSIGNED_LONG_LONG, recvNeighbor, 200, vs->MPI_COMM, MPI_STATUS_IGNORE);
-
-                // no wait is needed, as we used sparse array in the send and now only dense arrays are needed
-                
-                // reduction
-                uint32_t vert;
-                for (size_t i = 0; i < vs->sizeSparse; i++) {
-                    vert = vs->sparseArray[i];
-                    Bitmap_Set_Shifted(vs->bitArray, vert, vs->indexShift, vs->size_bitarray);
-                }
-                vs->isdense=true;
+            // do reduction           
+            for (int i = 0; i < recvCount; i++) {
+                vs->bitArray[i] |= vs->bitBuffer[i];
             }
+            vs->isdense = true;
             
         } else {
             assert("recieved wrong tag" && false);

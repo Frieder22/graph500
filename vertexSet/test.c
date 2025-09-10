@@ -255,12 +255,12 @@ bool test_Allreduce_single(void (*reduceFunc) (Vertexset*, int), int setSize, fl
 bool test_Allreduce_batch(void (*reduceFunc) (Vertexset*, int)){
     bool isCorrect = true;
     isCorrect &= test_Allreduce_single(reduceFunc, 1000000, 0.01);
-    isCorrect &= test_Allreduce_single(reduceFunc, 100, 1.0);
+    isCorrect &= test_Allreduce_single(reduceFunc, 100, 0.02);
     isCorrect &= test_Allreduce_single(reduceFunc, 1, 0.5);
     isCorrect &= test_Allreduce_single(reduceFunc, 63, 0.3);
     isCorrect &= test_Allreduce_single(reduceFunc, 64, 0.3);
     isCorrect &= test_Allreduce_single(reduceFunc, 65, 0.3);
-    //isCorrect &= test_Allreduce_single(reduceFunc, 1<<25, 0.3);  
+    isCorrect &= test_Allreduce_single(reduceFunc, 1<<25, 0.3);  
     if (rank==0) {
         if (isCorrect) {
             printf(ANSI_GREEN"\n--------------------------------------------\n");
