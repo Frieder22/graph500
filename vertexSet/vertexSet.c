@@ -709,82 +709,143 @@ void Vertexset_Allreduce_Ring_Comm(Vertexset* const vs, const int VERTEXSET_OPER
 
 void Vertexset_Allreduce_Dense(Vertexset* const vs, const int VERTEXSET_OPERATION){
     assert(VERTEXSET_OPERATION == VERTEXSET_OR); // no other operator implemented
-    assert((vs->mpi_size & (vs->mpi_size - 1)) == 0); // communicator must be size of 2^k
     assert(vs->isdense);
 
-    // find block indices
-    int blockIdx[vs->mpi_size + 1];
-    blockIdx[0] = 0;
-    for (int i = 1; i < vs->mpi_size + 1; i++) {
-        blockIdx[i] = vs->size_bitarray * i / vs->mpi_size;
-    }
-    
-    // do reduce_scatter
-    int commNeighbor;
-    int startBlock;
-    int startIndex;
-    int startIndexRecv;
-    int nElements;
-    int tag;
-    MPI_Status status;
-    MPI_Request req;
-    int recvCount;
-    for (int shift = vs->mpi_size / 2 ; shift >= 1; shift/=2) {
-        // do bitflip with LOR to find neighbor
-        commNeighbor = vs->mpi_rank ^ shift;
+    if (!vs->approx_halfing){
+        assert((vs->mpi_size & (vs->mpi_size - 1)) == 0); // communicator must be size of 2^k
 
-
-        // find start indices of send message
-        startBlock = (commNeighbor/shift) * shift;
-        startIndex = blockIdx[startBlock];
-        nElements = blockIdx[startBlock + shift] - startIndex;
-
-        // send dense array
-        //MPI_Isend(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, commNeighbor, 200, vs->MPI_COMM, &req);
-
-        // get indices of recieve message
-        startBlock = (vs->mpi_rank/shift) * shift;
-        startIndexRecv = blockIdx[startBlock];
-        recvCount = blockIdx[startBlock + shift]-startIndexRecv;
-        
-
-        //MPI_Probe(commNeighbor, MPI_ANY_TAG, vs->MPI_COMM, &status);
-        //MPI_Get_count(&status, MPI_LONG_LONG, &recvCount);
-        MPI_Sendrecv(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, commNeighbor, 200,
-                    vs->bitBuffer, recvCount, MPI_UNSIGNED_LONG_LONG, commNeighbor, 200, vs->MPI_COMM, MPI_STATUS_IGNORE);
-
-        
-
-        // Recieve into buffer
-        // MPI_Recv(vs->bitBuffer, recvCount, MPI_UNSIGNED_LONG_LONG, commNeighbor, 200, vs->MPI_COMM, MPI_STATUS_IGNORE);
-        // MPI_Wait(&req, MPI_STATUS_IGNORE);
-        // do reduction
-        for (int i = startIndexRecv; i < blockIdx[startBlock + shift]; i++) {
-            vs->bitArray[i] |= vs->bitBuffer[i-startIndexRecv];
+        // find block indices
+        int blockIdx[vs->mpi_size + 1];
+        blockIdx[0] = 0;
+        for (int i = 1; i < vs->mpi_size + 1; i++) {
+            blockIdx[i] = vs->size_bitarray * i / vs->mpi_size;
         }
         
+        // do reduce_scatter
+        int commNeighbor;
+        int startBlock;
+        int startIndex;
+        int startIndexRecv;
+        int nElements;
+        int tag;
+        MPI_Status status;
+        MPI_Request req;
+        int recvCount;
+        for (int shift = vs->mpi_size / 2 ; shift >= 1; shift/=2) {
+            // do bitflip with LOR to find neighbor
+            commNeighbor = vs->mpi_rank ^ shift;
+
+
+            // find start indices of send message
+            startBlock = (commNeighbor/shift) * shift;
+            startIndex = blockIdx[startBlock];
+            nElements = blockIdx[startBlock + shift] - startIndex;
+
+            // get indices of recieve message
+            startBlock = (vs->mpi_rank/shift) * shift;
+            startIndexRecv = blockIdx[startBlock];
+            recvCount = blockIdx[startBlock + shift]-startIndexRecv;
+
+            MPI_Sendrecv(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, commNeighbor, 200,
+                        vs->bitBuffer, recvCount, MPI_UNSIGNED_LONG_LONG, commNeighbor, 200, vs->MPI_COMM, MPI_STATUS_IGNORE);
+
+            for (int i = startIndexRecv; i < blockIdx[startBlock + shift]; i++) {
+                vs->bitArray[i] |= vs->bitBuffer[i-startIndexRecv];
+            }
+            
+        }
+
+        // do allGather
+        for (int shift = 1; shift < vs->mpi_size; shift*=2)  {
+            // do bitflip with LOR to find neighbor
+            commNeighbor = vs->mpi_rank ^ shift;
+
+            // find start indices of send
+            startBlock = (vs->mpi_rank/shift) * shift;
+            startIndex = blockIdx[startBlock];
+            nElements = blockIdx[startBlock + shift] - startIndex;
+            
+            // calculate start index and recv count
+            startBlock = (commNeighbor/shift) * shift;
+            startIndexRecv = blockIdx[startBlock];
+            recvCount = blockIdx[startBlock + shift]-startIndexRecv;
+            
+            // Sending and recieval of blocks
+            MPI_Sendrecv(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, commNeighbor, 101,
+                        vs->bitArray + startIndexRecv, recvCount, MPI_UNSIGNED_LONG_LONG, commNeighbor, 101,
+                        vs->MPI_COMM, MPI_STATUS_IGNORE);
+        }  
+    } else {
+        // find number of iterations
+        int iterations;
+        if ((vs->mpi_size & (vs->mpi_size - 1)) == 0) {
+            // just the log, if mpi_size == 2^k
+            iterations = Vertexset_Log2_floor(vs->mpi_size);
+        } else {
+            // ceil(log), if mpi_size =/= 2^k
+            iterations = Vertexset_Log2_floor(vs->mpi_size) + 1;
+        }
+
+        // allocate memory to save skip sequence
+        int skipSequence[iterations + 1];
+        skipSequence[iterations] = vs->mpi_size;
+        
+
+        // do reduce_scatter
+        int sendNeighbor;
+        int recvNeighbor;
+        int recvCount;
+        int nElements;
+        int startIndex;
+        int shift = vs->mpi_size;
+        int shift_old, shift_next;
+        for (int i = 0; i < iterations; i++) {
+            // update shift
+            shift_old = shift;
+            shift = shift - shift/2; // ceil(shift/2)
+            skipSequence[iterations - i - 1] = shift;
+            
+            // find communication neighbors
+            sendNeighbor = (vs->mpi_rank + shift) % vs->mpi_size;
+            recvNeighbor = (vs->mpi_rank - shift + vs->mpi_size) % vs->mpi_size;
+            
+            // find start indices of dense send
+            startIndex = vs->block_Indices[shift];
+            
+            // find the size of dense send
+            nElements = vs->block_Indices[shift_old] - startIndex;
+
+            // find the size that is recieved          
+            recvCount = vs->block_Indices[shift_old - shift];
+ 
+            MPI_Sendrecv(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, sendNeighbor, 200,
+                         vs->bitBuffer, recvCount, MPI_UNSIGNED_LONG_LONG, recvNeighbor, 200, vs->MPI_COMM, MPI_STATUS_IGNORE);
+            // do reduction           
+            for (int i = 0; i < recvCount; i++) {
+                vs->bitArray[i] |= vs->bitBuffer[i];
+            }
+        }
+        
+
+        // do allGather
+        for (int i=0; i < iterations; i++)  {
+            // find shifts
+            shift = skipSequence[i];
+            shift_next = skipSequence[i+1];        
+            
+            // find communication neighbors
+            sendNeighbor = (vs->mpi_rank - shift + vs->mpi_size) % vs->mpi_size;
+            recvNeighbor = (vs->mpi_rank + shift) % vs->mpi_size;
+            
+            recvCount = vs->block_Indices[shift_next] - vs->block_Indices[shift];
+            MPI_Sendrecv(vs->bitArray, vs->block_Indices[shift_next - shift], MPI_UNSIGNED_LONG_LONG, sendNeighbor, 101,
+                        vs->bitArray + vs->block_Indices[shift], recvCount, MPI_UNSIGNED_LONG_LONG, recvNeighbor,101,
+                        vs->MPI_COMM, MPI_STATUS_IGNORE);
+        }
+        vs->isdense = true; 
     }
+    
 
-    // do allGather
-    for (int shift = 1; shift < vs->mpi_size; shift*=2)  {
-        // do bitflip with LOR to find neighbor
-        commNeighbor = vs->mpi_rank ^ shift;
-
-        // find start indices of send
-        startBlock = (vs->mpi_rank/shift) * shift;
-        startIndex = blockIdx[startBlock];
-        nElements = blockIdx[startBlock + shift] - startIndex;
-        
-        // calculate start index and recv count
-        startBlock = (commNeighbor/shift) * shift;
-        startIndexRecv = blockIdx[startBlock];
-        recvCount = blockIdx[startBlock + shift]-startIndexRecv;
-        
-        // Sending and recieval of blocks
-        MPI_Sendrecv(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, commNeighbor, 101,
-                     vs->bitArray + startIndexRecv, recvCount, MPI_UNSIGNED_LONG_LONG, commNeighbor, 101,
-                    vs->MPI_COMM, MPI_STATUS_IGNORE);
-    }  
 };
 
 
