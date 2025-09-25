@@ -1,6 +1,7 @@
 #include "vertexSet.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 #include "mpi.h"
 
 int rank, size;
@@ -32,10 +33,11 @@ void predReduce(int *invec, int *inoutvec, int *len, MPI_Datatype *datatype){
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
-
+    
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
-
+    /*
+    
     if (rank==0) {    
     int32_t *a;
     int32_t *b;
@@ -60,7 +62,6 @@ int main(int argc, char *argv[]) {
     free(temp);
     }
         
-    /*
     int *buff;
     if (rank == 0) {
         int n = 10;
@@ -79,6 +80,18 @@ int main(int argc, char *argv[]) {
     }
     */
     
+    Vertexset vs;
+    Vertexset_Init(&vs, 512, MPI_COMM_WORLD);
+
+    Vertexset_TransformToDense(&vs);
+
+    for (size_t i = 0; i < 64; i++) {
+        Vertexset_Add(&vs, i + 2*64*rank);
+    }
+    
+    Vertexset_Allreduce_Exact_Halfing(&vs, VERTEXSET_OR);
+
+
     
     MPI_Finalize();
     return 0;

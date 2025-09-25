@@ -40,8 +40,8 @@ void printTestInfo(int testnumber){
         case APROXIMATE_HALFING:
             printf("Testing functionality of Aproximate Halfing Reduce.\n");
             break;
-        case RING_TOPO:
-            printf("Testing functionality of Ring Topology Reduce.\n");
+        case NAIVE:
+            printf("Testing functionality of Naive Reduce.\n");
             break;
         case DENSE:
             printf("Testing functionality of Dense Reduce.\n");
@@ -260,7 +260,7 @@ bool test_Allreduce_batch(void (*reduceFunc) (Vertexset*, int)){
     isCorrect &= test_Allreduce_single(reduceFunc, 63, 0.3);
     isCorrect &= test_Allreduce_single(reduceFunc, 64, 0.3);
     isCorrect &= test_Allreduce_single(reduceFunc, 65, 0.3);
-    //isCorrect &= test_Allreduce_single(reduceFunc, 1<<25, 0.3);  
+    isCorrect &= test_Allreduce_single(reduceFunc, 1<<25, 0.3);  
     if (rank==0) {
         if (isCorrect) {
             printf(ANSI_GREEN"\n--------------------------------------------\n");
@@ -487,8 +487,8 @@ int main(int argc, char *argv[]){
             test_Allreduce_batch(Vertexset_Allreduce_Approximate_Halfing);
             break;
 
-        case RING_TOPO: // Test allreduce using ring topology
-            test_Allreduce_batch(Vertexset_Allreduce_Ring_Comm);
+        case NAIVE: // Test allreduce using ring topology
+            test_Allreduce_batch(Vertexset_Allreduce_Naive);
             break;
 
         case DENSE: // Test dense allreduce

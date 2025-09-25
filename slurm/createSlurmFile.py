@@ -4,7 +4,7 @@ import ctypes
 
 # Possible selections for modes and funcs
 modes_selection = ["test", "perf"]
-funcs_selection = ["EXACT_HALFING", "APROXIMATE_HALFING", "DENSE"]
+funcs_selection = ["EXACT_HALFING", "APROXIMATE_HALFING", "DENSE", "NAIVE"]
 mpi_selection = {"openmpi": "spack load openmpi@4.1.6",
                   "mpich": "module load mpich/4.1.2-gcc-12.1.0-r7lq47v",
                   "intelmpi": "module load mpi/intelmpi"}

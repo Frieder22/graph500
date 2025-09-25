@@ -34,8 +34,8 @@ void fillInFunctionName(char* filepath, void (*reduceFunc) (Vertexset*, int)){
     } else if (reduceFunc == Vertexset_Allreduce_Approximate_Halfing) {
         char filename[] = "approx_Halfing";
         strcat(filepath, filename);
-    } else if (reduceFunc == Vertexset_Allreduce_Ring_Comm) {
-        char filename[] = "ring_Comm";
+    } else if (reduceFunc == Vertexset_Allreduce_Naive) {
+        char filename[] = "naive";
         strcat(filepath, filename);
     } else if (reduceFunc == Vertexset_Allreduce_Dense) {
         char filename[] = "dense";
@@ -391,14 +391,14 @@ int main(int argc, char *argv[]){
         break;
 
     // measure peprformance of ring comm reduce
-    case RING_TOPO:
+    case NAIVE:
         if (rank==0) {
             printf("-------------------------------------------------------------\n");
-            printf("Testing performance of Vertexset_Allreduce_Ring_Comm...\n");
+            printf("Testing performance of Vertexset_Allreduce_Naive...\n");
             printf("-------------------------------------------------------------\n");
         }
-        performance_sizeSeries(Vertexset_Allreduce_Ring_Comm, SETFILLING);
-        performance_fillingSeries(Vertexset_Allreduce_Ring_Comm, SETSIZE);
+        performance_sizeSeries(Vertexset_Allreduce_Naive, SETFILLING);
+        performance_fillingSeries(Vertexset_Allreduce_Naive, SETSIZE);
         break;
 
     // measure peprformance of dense reduce

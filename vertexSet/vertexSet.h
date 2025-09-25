@@ -141,7 +141,7 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* vs, int VERTEXSET_OPERATION);
  */
 void Vertexset_Allreduce_Approximate_Halfing(Vertexset* vs, int VERTEXSET_OPERATION);
 
-void Vertexset_Allreduce_Ring_Comm(Vertexset* vs, int VERTEXSET_OPERATION);
+void Vertexset_Allreduce_Naive(Vertexset* vs, int VERTEXSET_OPERATION);
 
 void Vertexset_Allreduce_Dense(Vertexset* vs, int VERTEXSET_OPERATION);
 

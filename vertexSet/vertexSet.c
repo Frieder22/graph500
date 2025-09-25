@@ -327,6 +327,8 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* const vs, const int VERTEXSET_
             // get length of message
             MPI_Get_count(&status, MPI_UNSIGNED_LONG_LONG, &recvCount);
             
+            startBlock = (vs->mpi_rank/shift) * shift;
+            startIndex = blockIdx[startBlock];
             
             // choose reduction style depenmding on set state (dense/sparse)            
             if (vs->isdense) {
@@ -336,8 +338,6 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* const vs, const int VERTEXSET_
                 MPI_Wait(&req, MPI_STATUS_IGNORE);
 
                 // do reduction
-                startBlock = (vs->mpi_rank/shift) * shift;
-                startIndex = blockIdx[startBlock];
                 assert(recvCount == blockIdx[startBlock + shift]-startIndex);
                 for (int i = startIndex; i < blockIdx[startBlock + shift]; i++) {
                     vs->bitArray[i] |= vs->bitBuffer[i-startIndex];
@@ -347,9 +347,6 @@ void Vertexset_Allreduce_Exact_Halfing(Vertexset* const vs, const int VERTEXSET_
                 // own set is sparse
                 // recieve directly into main bitarray (no buffering is needed)
                 // also we can assume the memory of the bitarrays is 0 everywhere.
-                startBlock = (vs->mpi_rank/shift) * shift;
-                startIndex = blockIdx[startBlock];
-                Bitmap_Clean(vs->bitArray, vs->size_bitarray);
                 MPI_Recv(vs->bitArray + startIndex, recvCount, MPI_UNSIGNED_LONG_LONG, commNeighbor, 200, vs->MPI_COMM, MPI_STATUS_IGNORE);
 
                 // no wait is needed, as we used sparse array in the send and now only dense arrays are needed
@@ -560,143 +557,46 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* const vs, const int VERT
     vs->isdense = true;
 };
 
-void Vertexset_Allreduce_Ring_Comm(Vertexset* const vs, const int VERTEXSET_OPERATION){
+void Vertexset_Allreduce_Naive(Vertexset* const vs, const int VERTEXSET_OPERATION){
     assert(VERTEXSET_OPERATION == VERTEXSET_OR); // no other operator implemented
-    
-    // find block indices
-    int blockIdx[vs->mpi_size + 1];
-    blockIdx[0] = 0;
-    for (int i = 1; i < vs->mpi_size + 1; i++) {
-        blockIdx[i] = vs->size_bitarray * i / vs->mpi_size;
-    }
+    int displ [vs->mpi_size];
 
-    // find ciritical size
-    size_t criticalSize = vs->sizeCrit;
-
-    // prepare, if vertexset is sparse
-    if (!(vs->isdense)) {
-        Bitmap_Clean(vs->bitArray, vs->size_bitarray);
-        int count=0;
-        uint32_t vert;
-        for (size_t i = 0; i < vs->sizeSparse; i++) {
-            vert = vs->sparseArray[i];
-            if (count <= (criticalSize/vs->mpi_size)){
-                // add to sparse list and update bitarray
-                if (!(Bitmap_Test(vs->bitArray, vert))) {
-                    // add to correct sparse list, while avoiding dublicates
-                    vs->sparseBuffer[count++] = vert;
-                    Bitmap_Set(vs->bitArray, vert);
-                }
-            } else {
-                // update bitarray (without caring about sparse)
-                Bitmap_Set(vs->bitArray, vert);
-            }
-        }
-        // set correctly counted size
-        vs->sizeSparse = count;
-        
-        // switching pointer to original
-        if (count <= (criticalSize/vs->mpi_size)) {
-            // only neccary, when sparse variant is needed   
-            uint32_t *temp;
-            temp = vs->sparseArray;
-            vs->sparseArray = vs->sparseBuffer;
-            vs->sparseBuffer = temp;
-            temp = NULL;        
-        }
-    }
+    int criticalSize = vs->sizeCrit;
 
     if (vs->isdense) {
         vs->sizeSparse = criticalSize + 1;
     }
+    
 
-    // do ring communication
-    int sendBlock, nElementsDense, startIdx;
-    int recvNeigh, sendNeigh;
-    int recvCount, tag;
-    MPI_Request req;
-    MPI_Status status;
-    for (size_t iteration = 0; iteration < 2*vs->mpi_size; iteration++) {
-        // find, which block to send
-        sendBlock = (vs->mpi_rank + iteration) % vs->mpi_size;
+    // find how many entries are proposed.
+    MPI_Allgather(&(vs->sizeSparse), 1, MPI_INT, vs->sizesAll, 1, MPI_INT, MPI_COMM_WORLD);
+    
+    // calculate displacements with exclusive scan
+    displ[0] = 0;
+    for (int j = 1; j < vs->mpi_size + 1; j++){
+        displ[j] = displ[j-1] + vs->sizesAll[j-1];
+    }
 
-        // find start and size of block
-        startIdx = blockIdx[sendBlock];
-        nElementsDense = blockIdx[sendBlock + 1] - startIdx;
+    if (displ[vs->mpi_size] < criticalSize) {
+        MPI_Allgatherv(vs->sparseArray, vs->sizeSparse, MPI_INT32_T, vs->sparseBuffer, vs->sizesAll, displ, MPI_INT32_T, MPI_COMM_WORLD);
 
-        // find communication neighbors
-        recvNeigh = (vs->mpi_rank - 1 + vs->mpi_size) % vs->mpi_size;
-        sendNeigh = (vs->mpi_rank + 1) % vs->mpi_size;
+        // switch pointer
+        uint32_t *temp;
+        temp = vs->sparseBuffer;
+        vs->sparseBuffer = vs->sparseArray;
+        vs->sparseArray = temp;
+        temp = NULL;
 
-
-        // devide, if send sparse or dense array
-        if (vs->sizeSparse <= criticalSize/vs->mpi_size) {
-            // do sparse send
-            MPI_Isend(vs->sparseArray, vs->sizeSparse, MPI_INT32_T, sendNeigh, 100, vs->MPI_COMM, &req);            
-        } else {
-            // do dense send
-            MPI_Isend(vs->bitArray + startIdx, nElementsDense, MPI_UNSIGNED_LONG_LONG, sendNeigh, 200, vs->MPI_COMM, &req);
-        }
-
-        // find which kind of message is recieved
-        MPI_Probe(recvNeigh, MPI_ANY_TAG, vs->MPI_COMM, &status);
-        tag = status.MPI_TAG;
-        if (tag==100) {
-            // sparse recieve
-            MPI_Get_count(&status, MPI_INT32_T, &recvCount);
-
-            // recieve into buffer
-            MPI_Recv(vs->sparseBuffer, recvCount, MPI_INT32_T, recvNeigh, 100, vs->MPI_COMM, MPI_STATUS_IGNORE);
-
-            // wait for save usage of sparse array
-            MPI_Wait(&req, MPI_STATUS_IGNORE);
-
-            int count=vs->sizeSparse;
-            uint32_t vert;
-            // do reduction (append non dublicates and also update bitarray)
-            for (size_t j = 0; j < recvCount; j++)  {
-                vert = vs->sparseBuffer[j];
-                if (count <= criticalSize/vs->mpi_size || iteration == vs->mpi_size - 1) {
-                    // set bitmap, and add to sparse,if needed
-                    if (!Bitmap_Test(vs->bitArray, vert)) {
-                        // save in sparse array until its needed in next round
-                        Bitmap_Set(vs->bitArray, vert);
-                        vs->sparseArray[count++] = vert;                        
-                    }
-                } else {
-                    Bitmap_Set(vs->bitArray, vert);
-                }
-            }
-
-            // set count
-            vs->sizeSparse = count;
-
-        } else if (tag == 200) {
-            // do dense recieve
-            MPI_Get_count(&status, MPI_UNSIGNED_LONG_LONG, &recvCount);
-
-            // recieve int dense buffer
-            MPI_Recv(vs->bitBuffer, recvCount, MPI_UNSIGNED_LONG_LONG, recvNeigh, 200, vs->MPI_COMM, MPI_STATUS_IGNORE);
-
-            // wait for save usage of dense array
-            MPI_Wait(&req, MPI_STATUS_IGNORE);
-
-            // do reduction
-            startIdx = blockIdx[(recvNeigh + iteration) % vs->mpi_size];
-            for (size_t j = 0; j < recvCount; j++) {
-                vs->bitArray[startIdx + j] |= vs->bitBuffer[j];
-            }
-
-            vs->sizeSparse = criticalSize;
-        }
-        // last iteration defines format of output
-        if(iteration == vs->mpi_size - 1){
-            if (tag==100) {
-                vs->isdense = false;
-            } else if(tag==200) {
-                vs->isdense = true;
-            }    
-        }
+        // set new sparse size
+        vs->sizeSparse = displ[vs->mpi_size];
+    } else {
+        Vertexset_TransformToDense(vs);
+        MPI_Allreduce(vs->bitArray, vs->bitBuffer, vs->size_bitarray, MPI_UINT64_T, MPI_BOR, MPI_COMM_WORLD);
+        unsigned long long *temp;
+        temp = vs->bitBuffer;
+        vs->bitBuffer = vs->bitArray;
+        vs->bitArray = temp;
+        temp = NULL;
     }
 };
 

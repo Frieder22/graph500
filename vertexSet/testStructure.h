@@ -5,7 +5,7 @@ enum Testcase{
     ITERATOR,
     EXACT_HALFING,
     APROXIMATE_HALFING,
-    RING_TOPO,
+    NAIVE,
     DENSE,
     VERTEXSET_TEST
 };
