@@ -357,7 +357,6 @@ void performance_fillingSeries(void (*reduceFunc) (Vertexset*, int), int setSize
     }
 }
 
-
 int main(int argc, char *argv[]){
     MPI_Init(&argc, &argv);
 
@@ -388,6 +387,7 @@ int main(int argc, char *argv[]){
             printf("-------------------------------------------------------------\n");
         }        
         performance_sizeSeries(Vertexset_Allreduce_Approximate_Halfing, SETFILLING);
+        performance_fillingSeries(Vertexset_Allreduce_Approximate_Halfing, SETSIZE);
         break;
 
     // measure peprformance of ring comm reduce
