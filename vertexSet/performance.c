@@ -152,6 +152,9 @@ void performance_sizeSeries(void (*reduceFunc) (Vertexset*, int), float filling)
             }
 
             // reduce Vertexset
+            if (reduceFunc == Vertexset_Allreduce_Dense) {
+                Vertexset_TransformToDense(&vs);
+            }
             MPI_Barrier(MPI_COMM_WORLD);
             startTime = MPI_Wtime();
             (*reduceFunc) (&vs, VERTEXSET_OR);
@@ -297,6 +300,9 @@ void performance_fillingSeries(void (*reduceFunc) (Vertexset*, int), int setSize
             }
 
             // reduce Vertexset
+            if (reduceFunc == Vertexset_Allreduce_Dense) {
+                Vertexset_TransformToDense(&vs);
+            }
             MPI_Barrier(MPI_COMM_WORLD);
             startTime = MPI_Wtime();
             (*reduceFunc) (&vs, VERTEXSET_OR);
