@@ -25,9 +25,14 @@
 #define SETFILLING 0.1
 
 int rank, size;
+char datafolder[1000];
 extern enum Testcase Testcase;
 
 void fillInFunctionName(char* filepath, void (*reduceFunc) (Vertexset*, int)){
+    // add in mpi library in path
+    strcat(filepath, datafolder);
+
+    // name file according to function
     if (reduceFunc == Vertexset_Allreduce_Exact_Halfing) {
         char filename[] = "exact_Halfing";
         strcat(filepath, filename);
@@ -363,9 +368,20 @@ int main(int argc, char *argv[]){
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    assert(argc == 2);
+    assert(argc >= 2);
     int testNumber = atoi(argv[1]);
     
+    if (argc == 3) {
+        if (rank==0) {
+            printf("Mpi library used: %s\n", argv[2]);
+        }        
+        strcat(datafolder, argv[2]);
+        strcat(datafolder, "/");
+    } else {
+        strcpy(datafolder, "uncategorized/");
+    }
+    
+
 
     switch (testNumber) {
     // perf_red_exactHalfing: measure performance of allreduce 

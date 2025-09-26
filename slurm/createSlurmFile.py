@@ -76,8 +76,12 @@ with open("run.job", "w") as f:
     f.write("#SBATCH --ntasks-per-node={}\n".format(perNode))
     f.write("#SBATCH --cpu-freq=High\n")
     f.write("#SBATCH --time=3:00\n")
-    f.write("srun ../build/{}.o {}\n".format(mode, testnumber[func]))
+    if (mode == "perf"):
+        f.write("srun ../build/{}.o {} {}\n".format(mode, testnumber[func], mpi))
+    else:
+        f.write("srun ../build/{}.o {} \n".format(mode, testnumber[func]))
 
 # set correct mpi library in config file
 with open("default.config", "w") as f:
-    f.write("MPI_VARIANT = {}\n".format(mpi_selection[mpi]))
+    f.write("MPI_LOAD = {}\n".format(mpi_selection[mpi]))
+    f.write("MPI_Variant = {}\n".format(mpi))
