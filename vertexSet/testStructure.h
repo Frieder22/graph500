@@ -7,7 +7,8 @@ enum Testcase{
     APROXIMATE_HALFING,
     NAIVE,
     DENSE,
-    VERTEXSET_TEST
+    VERTEXSET_TEST,
+    ALLGATHER
 };
 
 

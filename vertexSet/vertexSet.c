@@ -748,7 +748,80 @@ void Vertexset_Allreduce_Dense(Vertexset* const vs, const int VERTEXSET_OPERATIO
 
 };
 
+void Vertexset_Allgather(Vertexset* vs){
+    // safety measure
+    if (vs->mpi_size < 2) {
+        return;
+    }
+    
+    int shift = 1 << Vertexset_Log2_floor(vs->mpi_size-1);
+    int to, from;
+    int nBlocks;
+    MPI_Request req;
+    MPI_Status status;
+    int tail = vs->mpi_size;
+    int recvCount;
+    bool inBuff = false;
+    int sizeBuff=0;
+    int sizeSparse = vs->sizeSparse;
 
+    // add blockinfo to sparse array
+    vs->sparseArray[sizeSparse] = sizeSparse;
+
+    while (shift >=1 ) {
+        to = (vs->mpi_rank - shift + vs->mpi_size) % vs->mpi_size;
+        from = (vs->mpi_rank + shift) % vs->mpi_size;
+        
+        if (tail>shift || tail == 0 ) {
+            // tail is bigger than shift and must be sent
+            if (inBuff) {
+                // buffered block must be copied into pile
+                memcpy(vs->sparseArray +  sizeSparse, vs->sparseBuffer, (sizeBuff+1)*sizeof(uint32_t));
+                sizeSparse += sizeBuff;
+                inBuff = false;
+            }
+            MPI_Isend(vs->sparseArray, sizeSparse + 1, MPI_UINT32_T, to, 100, vs->MPI_COMM, &req);
+            MPI_Probe(from, 100, vs->MPI_COMM, &status);
+            MPI_Get_count(&status, MPI_UINT32_T, &recvCount);
+            MPI_Recv(vs->sparseArray + sizeSparse, recvCount, MPI_UINT32_T, from, 100, vs->MPI_COMM, MPI_STATUS_IGNORE);
+            MPI_Wait(&req, MPI_STATUS_IGNORE);
+            sizeSparse += recvCount-1;
+
+            tail -= shift;
+        } else {
+            // tail is smaller or equal to shift and must be buffered
+            if (!inBuff) {
+                // last block is is copied from pile to buffer
+                sizeBuff = vs->sparseArray[sizeSparse];
+                memcpy(vs->sparseBuffer, vs->sparseArray + sizeSparse - sizeBuff, (sizeBuff+1)*sizeof(uint32_t));
+                sizeSparse -= sizeBuff;
+                inBuff=true;
+            }
+
+            MPI_Isend(vs->sparseArray, sizeSparse+1, MPI_UINT32_T, to, 100, vs->MPI_COMM, &req);
+            MPI_Probe(from, 100, vs->MPI_COMM, &status);
+            MPI_Get_count(&status, MPI_UINT32_T, &recvCount);
+            MPI_Recv(vs->sparseArray + sizeSparse, recvCount, MPI_UINT32_T, from, 100, vs->MPI_COMM, MPI_STATUS_IGNORE);
+            sizeSparse += recvCount-1;
+        }
+
+        
+        shift /= 2;
+    }
+
+    // copy block on pile, if it is buffered after last iteration
+    if (inBuff) {
+        // buffered block must be copied into pile
+        memcpy(vs->sparseArray +  sizeSparse, vs->sparseBuffer, (sizeBuff+1)*sizeof(uint32_t));
+        sizeSparse += sizeBuff;
+        inBuff = false;
+    }
+
+    
+    vs->sizeSparse = sizeSparse;
+
+
+}
 
 void Vertexset_PrintSet(Vertexset* const vs){
     if(vs->isdense){

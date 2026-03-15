@@ -49,7 +49,10 @@ void printTestInfo(int testnumber){
         case VERTEXSET_TEST:
             printf("Testing functionality of Vertexset functions.\n");
             break;
-        
+        case ALLGATHER:
+            printf("Testing functionality of Allgather.\n");
+            break;     
+
         default:
             printf(ANSI_RED "Print function doesn't know this testcase!\n" ANSI_RESET);
             break;
@@ -455,6 +458,89 @@ bool test_Vertexset_dense(){
     }
 }
 
+bool test_Allgather_single(void (*allgatherFunc) (Vertexset*), int setSize, int filling){
+    bool isCorrect = true;
+    bool verbose = false;
+
+    int insertionsTotal = size * filling;
+
+    Vertexset vs;
+    Vertexset_Init(&vs, setSize, MPI_COMM_WORLD);
+    uint32_t* control;
+    control = (uint32_t*) malloc(insertionsTotal*sizeof(uint32_t));
+
+    assert(insertionsTotal <= vs.sizeCrit);
+
+    // Fill arrays with random numbers
+    int num;
+    for (size_t i = 0; i < insertionsTotal; i++) {
+        num = rand()%setSize;
+        control[i] = num;
+        if (i%size==rank) {
+            Vertexset_Add(&vs, num);
+        }
+    }
+
+    // perform Allgather
+    (*allgatherFunc) (&vs);
+
+    // sort array and controll 
+    qsort(vs.sparseArray, insertionsTotal, sizeof(uint32_t), comp);
+    qsort(control, insertionsTotal, sizeof(uint32_t), comp);
+
+    // compare elements
+    for (size_t i = 0; i < insertionsTotal; i++){
+        if (vs.sparseArray[i]!= control[i]) {
+            isCorrect=false;
+        }
+    }
+
+    //compare size of lists
+    if (vs.sizeSparse != insertionsTotal) {
+        isCorrect = false;
+    }
+    
+    
+    // Check if other ranks had problems
+    MPI_Allreduce(MPI_IN_PLACE, &isCorrect, 1, MPI_C_BOOL, MPI_LAND, MPI_COMM_WORLD);
+    
+    // Priont resulrt
+    if (rank==0) {
+        if (isCorrect) {
+            printf(ANSI_GREEN "Test Allgather SUCCESSFUL\n" ANSI_RESET);
+            printf("--------------------------------------------\n\n");
+        } else {
+            printf(ANSI_RED "Test Allgather FAILED\n" ANSI_RESET );
+            printf("--------------------------------------------\n\n");
+        }
+        Vertexset_PrintSet(&vs);
+    }
+
+    return isCorrect;
+    
+}
+
+
+bool test_Allgather_batch(void (*allgatherFunc) (Vertexset*)){
+    bool isCorrect = true;
+    isCorrect &= test_Allgather_single(Vertexset_Allgather, 500000, 2);
+    isCorrect &= test_Allgather_single(allgatherFunc, 500000, 1);
+    //isCorrect &= test_Allgather_single(Vertexset_Allgather, 5000, 5);
+    //isCorrect &= test_Allgather_single(Vertexset_Allgather, 200, 2);
+
+    if (rank==0) {
+        if (isCorrect) {
+            printf(ANSI_GREEN"\n--------------------------------------------\n");
+            printf("|          All tests SUCCESSFUL            |\n");
+            printf("--------------------------------------------\n\n"ANSI_RESET);
+        } else {
+            printf(ANSI_RED"\n--------------------------------------------\n");
+            printf("|           Some test(s) FAILED            |\n");
+            printf("--------------------------------------------\n\n"ANSI_RESET);
+        }        
+    } 
+    return isCorrect;
+}
 
 int main(int argc, char *argv[]){
     MPI_Init(&argc, &argv);
@@ -500,6 +586,8 @@ int main(int argc, char *argv[]){
             test_Vertexset_dense();
             break;
 
+        case ALLGATHER:
+            test_Allgather_batch(Vertexset_Allgather);
         default:
             break;
     }

@@ -83,15 +83,11 @@ int main(int argc, char *argv[]) {
     Vertexset vs;
     Vertexset_Init(&vs, 512, MPI_COMM_WORLD);
 
-    Vertexset_TransformToDense(&vs);
+    Vertexset_Add(&vs, rank);
 
-    for (size_t i = 0; i < 64; i++) {
-        Vertexset_Add(&vs, i + 2*64*rank);
-    }
-    
-    Vertexset_Allreduce_Exact_Halfing(&vs, VERTEXSET_OR);
+    Vertexset_Allgather(&vs);
 
-
+    Vertexset_PrintSet(&vs);
     
     MPI_Finalize();
     return 0;
