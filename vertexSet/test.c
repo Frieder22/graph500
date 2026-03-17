@@ -462,7 +462,7 @@ bool test_Allgather_single(void (*allgatherFunc) (Vertexset*), int setSize, int 
     bool isCorrect = true;
     bool verbose = false;
 
-    int insertionsTotal = size * filling;
+    int insertionsTotal = filling;
 
     Vertexset vs;
     Vertexset_Init(&vs, setSize, MPI_COMM_WORLD);
@@ -513,7 +513,6 @@ bool test_Allgather_single(void (*allgatherFunc) (Vertexset*), int setSize, int 
             printf(ANSI_RED "Test Allgather FAILED\n" ANSI_RESET );
             printf("--------------------------------------------\n\n");
         }
-        Vertexset_PrintSet(&vs);
     }
 
     return isCorrect;
@@ -523,8 +522,8 @@ bool test_Allgather_single(void (*allgatherFunc) (Vertexset*), int setSize, int 
 
 bool test_Allgather_batch(void (*allgatherFunc) (Vertexset*)){
     bool isCorrect = true;
-    isCorrect &= test_Allgather_single(Vertexset_Allgather, 500000, 2);
-    isCorrect &= test_Allgather_single(allgatherFunc, 500000, 1);
+    isCorrect &= test_Allgather_single(Vertexset_Allgather, 500000, size*2+4);
+    isCorrect &= test_Allgather_single(allgatherFunc, 500000, size +7);
     //isCorrect &= test_Allgather_single(Vertexset_Allgather, 5000, 5);
     //isCorrect &= test_Allgather_single(Vertexset_Allgather, 200, 2);
 

@@ -38,6 +38,9 @@ test_red_dense: test
 test_vertexset: test
 	mpirun -np 1 ./$(build)/test.o 5
 
+test_allgather: test
+	mpirun -np 4 ./$(build)/test.o 6
+
 perf: performance.c
 	$(GCC) $(CFLAGS) -o $(build)/perf.o performance.c $(SOURCES)
 

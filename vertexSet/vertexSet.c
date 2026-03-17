@@ -776,7 +776,7 @@ void Vertexset_Allgather(Vertexset* vs){
             // tail is bigger than shift and must be sent
             if (inBuff) {
                 // buffered block must be copied into pile
-                memcpy(vs->sparseArray +  sizeSparse, vs->sparseBuffer, (sizeBuff+1)*sizeof(uint32_t));
+                memcpy(vs->sparseArray +  sizeSparse, vs->sparseBuffer, sizeBuff*sizeof(uint32_t));
                 sizeSparse += sizeBuff;
                 inBuff = false;
             }
@@ -793,7 +793,7 @@ void Vertexset_Allgather(Vertexset* vs){
             if (!inBuff) {
                 // last block is is copied from pile to buffer
                 sizeBuff = vs->sparseArray[sizeSparse];
-                memcpy(vs->sparseBuffer, vs->sparseArray + sizeSparse - sizeBuff, (sizeBuff+1)*sizeof(uint32_t));
+                memcpy(vs->sparseBuffer, vs->sparseArray + sizeSparse - sizeBuff, sizeBuff*sizeof(uint32_t));
                 sizeSparse -= sizeBuff;
                 inBuff=true;
             }
