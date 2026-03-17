@@ -25,8 +25,11 @@ copy_to_cluster:
 	scp -r ../vertexSet/ hydra:~/.
 	scp -r ../slurm hydra:~/.
 
+init_cluster:
+	ssh -t hydra 'bash --login -i -c "mkdir -p build && mkdir data/performanceData/intelmpi && mkdir data/performanceData/openmpi && mkdir data/performanceData/mpich"'
+
 run: copy_to_cluster
-	ssh -t hydra 'bash --login -i -c "${MPI_VARIANT} && cd slurm && make submit_slurm"'
+	ssh -t hydra 'bash --login -i -c "${MPI_LOAD} && cd slurm && make submit_slurm"'
 
 get_Data:
 	scp -r hydra:~/data/ ../
