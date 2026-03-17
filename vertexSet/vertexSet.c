@@ -748,6 +748,102 @@ void Vertexset_Allreduce_Dense(Vertexset* const vs, const int VERTEXSET_OPERATIO
 
 };
 
+
+int Vertexset_reverseBits(int num, int N_bits){
+    int reverse_num = 0;
+    for (int i = 0; i < N_bits; i++){
+        if ((num & (1<<i))) {
+            reverse_num |= 1 << (N_bits - 1 - i);
+        }
+    }
+    return reverse_num;
+    
+}
+
+int Vertexset_nearestLog2(int p){
+    int count = 0;
+    while (p != 1) {
+        p >>= 1;
+        count++;
+    }
+    return (1<<count);
+}
+
+void Vertexset_Allreduce_Dense_ReverseBits(Vertexset* const vs, const int VERTEXSET_OPERATION){
+    assert(VERTEXSET_OPERATION == VERTEXSET_OR); // no other operator implemented
+    assert(vs->isdense);
+
+    assert((vs->mpi_size & (vs->mpi_size - 1)) == 0); // communicator must be size of 2^k
+
+    // find block indices
+    int blockIdx[vs->mpi_size + 1];
+    blockIdx[0] = 0;
+    for (int i = 1; i < vs->mpi_size + 1; i++) {
+        blockIdx[i] = vs->size_bitarray * i / vs->mpi_size;
+    }
+    
+    // do reduce_scatter
+    int commNeighbor;
+    int commNeighborRev;
+    int startBlock;
+    int startIndex;
+    int startIndexRecv;
+    int nElements;
+    int tag;
+    MPI_Status status;
+    MPI_Request req;
+    int recvCount;
+    int nIterations = Vertexset_Log2_floor(vs->mpi_size);
+    int reverseRank = Vertexset_reverseBits(vs->mpi_rank, nIterations);
+    for (int shift = vs->mpi_size / 2 ; shift >= 1; shift/=2) {
+        // do bitflip with LOR to find neighbor
+        commNeighbor = reverseRank ^ shift;
+        commNeighborRev = Vertexset_reverseBits(commNeighbor, nIterations);
+
+        // find start indices of send message
+        startBlock = (commNeighbor/shift) * shift;
+        startIndex = blockIdx[startBlock];
+        nElements = blockIdx[startBlock + shift] - startIndex;
+
+        // get indices of recieve message
+        startBlock = (reverseRank/shift) * shift;
+        startIndexRecv = blockIdx[startBlock];
+        recvCount = blockIdx[startBlock + shift]-startIndexRecv;
+
+        MPI_Sendrecv(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, commNeighborRev, 200,
+            vs->bitBuffer, recvCount, MPI_UNSIGNED_LONG_LONG, commNeighborRev, 200, vs->MPI_COMM, MPI_STATUS_IGNORE);
+            
+        for (int i = startIndexRecv; i < blockIdx[startBlock + shift]; i++) {
+            vs->bitArray[i] |= vs->bitBuffer[i-startIndexRecv];
+        }
+        
+    }
+
+    // do allGather
+    for (int shift = 1; shift < vs->mpi_size; shift*=2)  {
+        // do bitflip with LOR to find neighbor
+        commNeighbor = reverseRank ^ shift;
+        commNeighborRev = Vertexset_reverseBits(commNeighbor, nIterations);
+
+        // find start indices of send
+        startBlock = (reverseRank/shift) * shift;
+        startIndex = blockIdx[startBlock];
+        nElements = blockIdx[startBlock + shift] - startIndex;
+        
+        // calculate start index and recv count
+        startBlock = (commNeighbor/shift) * shift;
+        startIndexRecv = blockIdx[startBlock];
+        recvCount = blockIdx[startBlock + shift]-startIndexRecv;
+        
+        // Sending and recieval of blocks
+        MPI_Sendrecv(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, commNeighborRev, 101,
+                    vs->bitArray + startIndexRecv, recvCount, MPI_UNSIGNED_LONG_LONG, commNeighborRev, 101,
+                    vs->MPI_COMM, MPI_STATUS_IGNORE);
+    }  
+
+};
+
+
 void Vertexset_Allgather(Vertexset* vs){
     // safety measure
     if (vs->mpi_size < 2) {
