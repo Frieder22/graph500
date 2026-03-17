@@ -701,8 +701,15 @@ void Vertexset_Allreduce_Dense(Vertexset* const vs, const int VERTEXSET_OPERATIO
         int shift_old, shift_next;
         for (int i = 0; i < iterations; i++) {
             // update shift
-            shift_old = shift;
-            shift = shift - shift/2; // ceil(shift/2)
+            if (i==0){
+                shift_old = vs->mpi_size;
+                shift = Vertexset_nearestLog2(vs->mpi_size);
+                if(vs->mpi_rank == 0) printf("first iteration shift:%d\n", Vertexset_nearestLog2(vs->mpi_size));
+            }else{
+                shift_old = shift;
+                shift = shift - shift/2; // ceil(shift/2)
+            }
+            
             skipSequence[iterations - i - 1] = shift;
             
             // find communication neighbors
@@ -928,6 +935,7 @@ void Vertexset_PrintSet(Vertexset* const vs){
     for (size_t i = 0; i < vs->sizeSparse; i++) {
         printf("%d ", vs->sparseArray[i]);
         if (i > max_elements) {
+            printf("...");
             break;
         }
         
