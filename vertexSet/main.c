@@ -79,7 +79,6 @@ int main(int argc, char *argv[]) {
         printf("Count: %d", count);
     }
     */
-    
     Vertexset vs;
     Vertexset_Init(&vs, 512, MPI_COMM_WORLD);
 
@@ -88,6 +87,18 @@ int main(int argc, char *argv[]) {
     Vertexset_Allgather(&vs);
 
     Vertexset_PrintSet(&vs);
+
+    /*
+    int val= 15;
+    bool flag = false;
+
+    if (rank==0) {
+        printf("val: %d\n", flag*val);
+        flag =true;
+        printf("val: %d\n", flag*val);
+    }
+    
+    */
     
     MPI_Finalize();
     return 0;

@@ -6,17 +6,8 @@
 #include <mpi.h>
 #include <assert.h>
 #include <stdio.h>
+#include <utils.h>
 
-static inline int Vertexset_Log2_floor(int x){
-    int i;
-    for (i = 0; i < 32; i++) {
-        x = x >> 1;
-        if (x <= 0){
-            break;
-        }
-    }
-    return i;
-};
 
 void Vertexset_Init(Vertexset* const vs, const uint32_t maxsize, const MPI_Comm MPI_COMM){
     vs->maxsize = maxsize;
@@ -400,6 +391,18 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* const vs, const int VERT
     assert(vs->approx_halfing);  //works only for shifted entries
 
     int criticalSize = vs->sizeCrit;
+    int to;
+    int from;
+    int nElements;
+    int startIndex;
+    int tag;
+    MPI_Status status;
+    MPI_Request req;
+    int recvCount;        
+    int shift, shift_old, shift_next;
+    bool inBuff;
+    int sizeBuff, lastBlockSize;
+    int sizeSparse, tail;
 
     // find number of iterations
     int iterations;
@@ -414,59 +417,54 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* const vs, const int VERT
     // allocate memory to save skip sequence
     int skipSequence[iterations + 1];
     skipSequence[iterations] = vs->mpi_size;
-    
-    // prepare if sparse
-    if(!vs->isdense){
-        int countTrue = 0;
-        uint32_t vert;
-        // fill buffer with unique values and safe values in bitarray
-        for (size_t i = 0; i < vs->sizeSparse; i++) {
-            vert = vs->sparseArray[i];
-            if (!Bitmap_Test_Shifted(vs->bitArray, vert, vs->indexShift, vs->size_bitarray)) {
-                // insert in buffer
-                vs->sparseBuffer[countTrue++] = vert;
 
-                // insert in bitmap 
-                Bitmap_Set_Shifted(vs->bitArray, vert, vs->indexShift, vs->size_bitarray);
-            }
-        }
-        // set new sparse size
-        vs->sizeSparse = countTrue;
 
-        // switch buffer and array
-        uint32_t *temp;
-        temp = vs->sparseArray;
-        vs->sparseArray = vs->sparseBuffer;
-        vs->sparseBuffer = temp;
-        temp = NULL;        
-    }
+    // shifts for first iteration
+    shift_old = vs->mpi_size;
+    shift = Vertexset_nearestLog2(vs->mpi_size);
 
-    // do reduce_scatter
-    int sendNeighbor;
-    int recvNeighbor;
-    int nElements;
-    int startIndex;
-    int tag;
-    MPI_Status status;
-    MPI_Request req;
-    int recvCount;
-    int shift = vs->mpi_size;
-    int shift_old, shift_next;
+    // sparse array setup
+    sizeSparse = vs->sizeSparse;
+    lastBlockSize = sizeSparse;
+    tail = vs->mpi_size;
+    inBuff = false;
+
+
+
+    // do adapted Reducescatter
     for (int i = 0; i < iterations; i++) {
-        // update shift
-        shift_old = shift;
-        shift = shift - shift/2; // ceil(shift/2)
         skipSequence[iterations - i - 1] = shift;
-        
         // find communication neighbors
-        sendNeighbor = (vs->mpi_rank + shift) % vs->mpi_size;
-        recvNeighbor = (vs->mpi_rank - shift + vs->mpi_size) % vs->mpi_size;
+        to = (vs->mpi_rank + shift) % vs->mpi_size;
+        from = (vs->mpi_rank - shift + vs->mpi_size) % vs->mpi_size;
         
 
         // decide, which variant should be send
         if (!vs->isdense) {
+            // Handle tail location. Either in buffer or ontop of pile
+            if (tail>shift || tail == 0 ) {
+                // tail is bigger than shift and must be sent
+                if (inBuff) {
+                    // buffered block must be copied into pile
+                    memcpy(vs->sparseArray +  sizeSparse, vs->sparseBuffer, sizeBuff*sizeof(uint32_t));
+                    sizeSparse += sizeBuff;
+                    lastBlockSize = sizeBuff;
+                    inBuff = false;
+                }
+                tail -= shift;
+            } else {
+                // tail is smaller or equal to shift and must be buffered
+                if (!inBuff) {
+                    // last block is is copied from pile to buffer
+                    sizeBuff = lastBlockSize;
+                    memcpy(vs->sparseBuffer, vs->sparseArray + sizeSparse - sizeBuff, sizeBuff*sizeof(uint32_t));
+                    sizeSparse -= sizeBuff;
+                    inBuff=true;
+                }
+
+            }
             // send sparse array
-            MPI_Isend(vs->sparseArray, vs->sizeSparse, MPI_INT32_T, sendNeighbor, 100, vs->MPI_COMM, &req);
+            MPI_Isend(vs->sparseArray, sizeSparse, MPI_UINT32_T, to, lastBlockSize, vs->MPI_COMM, &req);
         } else {
             // find start indices of dense send
             startIndex = vs->block_Indices[shift];
@@ -475,76 +473,106 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* const vs, const int VERT
             nElements = vs->block_Indices[shift_old] - startIndex;
 
             // send dense array
-            MPI_Isend(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, sendNeighbor, 200, vs->MPI_COMM, &req);
+            MPI_Isend(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, to, INT32_MAX, vs->MPI_COMM, &req);
         }
 
         
         // get info, if recieved message is in dense or sparse format
-        MPI_Probe(recvNeighbor, MPI_ANY_TAG, vs->MPI_COMM, &status);
+        MPI_Probe(from, MPI_ANY_TAG, vs->MPI_COMM, &status);
         tag = status.MPI_TAG;
         
-        if (tag==100) {
+        if (tag < INT32_MAX) {
             // sparse array is recieved
             // get length of message
-            MPI_Get_count(&status, MPI_INT32_T, &recvCount);
+            MPI_Get_count(&status, MPI_UINT32_T, &recvCount);
             
             if (!vs->isdense) {
-                MPI_Recv(vs->sparseBuffer, recvCount, MPI_INT32_T, recvNeighbor, 100, vs->MPI_COMM, MPI_STATUS_IGNORE);
+                // reCieve directly in place
+                // send sparse array
+                MPI_Recv(vs->sparseArray + sizeSparse, recvCount, MPI_UINT32_T, from, MPI_ANY_TAG, vs->MPI_COMM, MPI_STATUS_IGNORE);
+                sizeSparse += recvCount;
+                lastBlockSize = status.MPI_TAG;
+
+                // transform into dense, if too long
+                if (sizeSparse + (inBuff*sizeBuff) > criticalSize) { //also count buffered elements!
+                    // add vertices from sparse array
+                    uint32_t vert;
+                    for (size_t i = 0; i < sizeSparse; i++) {
+                        vert = vs->sparseArray[i];
+                        Bitmap_Set_Shifted(vs->bitArray, vert, vs->indexShift, vs->size_bitarray);
+                    }
+                    // add vertives from buffer                
+                    if (inBuff) {
+                        for (size_t i = 0; i < sizeBuff; i++) {
+                            vert = vs->sparseBuffer[i];
+                            Bitmap_Set_Shifted(vs->bitArray, vert, vs->indexShift, vs->size_bitarray);
+                        }
+                    }
+                    vs->isdense = true;
+                }
+            } else {
+                // fill into dense format
+                MPI_Recv(vs->sparseArray , recvCount, MPI_INT32_T, from, MPI_ANY_TAG, vs->MPI_COMM, MPI_STATUS_IGNORE);
+                MPI_Wait(&req, MPI_STATUS_IGNORE);
                 uint32_t vert;
-
-                // fill buffer with unique values and safe values in bitarray
+                // add received vertices from sparse array
                 for (size_t i = 0; i < recvCount; i++) {
-                    vert = vs->sparseBuffer[i];
-                    if (!Bitmap_Test_Shifted(vs->bitArray, vert, vs->indexShift, vs->size_bitarray)) {
-                        // insert in buffer
-                        vs->sparseArray[vs->sizeSparse++] = vert;
+                    vert = vs->sparseArray[i];
+                    Bitmap_Set_Shifted(vs->bitArray, vert, vs->indexShift, vs->size_bitarray);
+                }
+            }
+        } else if (tag==INT32_MAX) {
+            // dense array is recieved          
+            // get length of message (can be done implicitly)
+            recvCount = vs->block_Indices[shift_old - shift];
+            // Recieve into buffer.
+            MPI_Recv(vs->bitBuffer, recvCount, MPI_UNSIGNED_LONG_LONG, from, MPI_ANY_TAG, vs->MPI_COMM, MPI_STATUS_IGNORE);
 
-                        // insert in bitmap 
+            if(vs->isdense){
+                // Wait until send buffer message is safe
+                MPI_Wait(&req, MPI_STATUS_IGNORE);
+
+                // do reduction           
+                for (int i = 0; i < recvCount; i++) {
+                    vs->bitArray[i] |= vs->bitBuffer[i];
+                }
+            } else {
+                uint32_t vert;
+                // add vertices from sparse array
+                for (size_t i = 0; i < sizeSparse; i++) {
+                    vert = vs->sparseArray[i];
+                    Bitmap_Set_Shifted(vs->bitArray, vert, vs->indexShift, vs->size_bitarray);
+                }
+                // add vertices from buffer
+                if (inBuff) {
+                    for (size_t i = 0; i < sizeBuff; i++) {
+                        vert = vs->sparseBuffer[i];
                         Bitmap_Set_Shifted(vs->bitArray, vert, vs->indexShift, vs->size_bitarray);
                     }
                 }
-                if (vs->sizeSparse > criticalSize) {
-                    vs->isdense = true;
-                }
-                
-            } else {
-                // fill into dense format
-                MPI_Recv(vs->sparseBuffer, recvCount, MPI_INT32_T, recvNeighbor, 100, vs->MPI_COMM, MPI_STATUS_IGNORE);
-                MPI_Wait(&req, MPI_STATUS_IGNORE);
-                uint32_t vert;
-                for (size_t i = 0; i < recvCount; i++) {
-                    vert = vs->sparseBuffer[i];
-                    Bitmap_Set_Shifted(vs->bitArray, vert, vs->indexShift, vs->size_bitarray);
-                }  
+                vs->isdense = true;
             }
-            
-        } else if (tag==200) {
-            // dense array is recieved          
-            // get length of message (can be done explicitly)
-            recvCount = vs->block_Indices[shift_old - shift];
-            // Recieve into buffer.
-            MPI_Recv(vs->bitBuffer, recvCount, MPI_UNSIGNED_LONG_LONG, recvNeighbor, 200, vs->MPI_COMM, MPI_STATUS_IGNORE);
-
-            // Wait until send buffer message is safe
-            MPI_Wait(&req, MPI_STATUS_IGNORE);
-
-            // do reduction           
-            for (int i = 0; i < recvCount; i++) {
-                vs->bitArray[i] |= vs->bitBuffer[i];
-            }
-            vs->isdense = true;
-            
         } else {
             assert("recieved wrong tag" && false);
         }
+        // update shift
+        shift_old = shift;
+        shift >>=1; // only exactly halfing
     }
     
     // decide, if allgather is needed.
     // In case only sparse communication was performed, we don't need allgather
     if (!vs->isdense) {
+        if (inBuff) {
+            // buffered block must be copied into pile
+            memcpy(vs->sparseArray +  sizeSparse, vs->sparseBuffer, sizeBuff*sizeof(uint32_t));
+            sizeSparse += sizeBuff;
+            inBuff = false;
+        }
+        vs->sizeSparse = sizeSparse;
         return;
     }
-
+    
 
     // do allGather
     for (int i=0; i < iterations; i++)  {
@@ -553,15 +581,14 @@ void Vertexset_Allreduce_Approximate_Halfing(Vertexset* const vs, const int VERT
         shift_next = skipSequence[i+1];        
         
         // find communication neighbors
-        sendNeighbor = (vs->mpi_rank - shift + vs->mpi_size) % vs->mpi_size;
-        recvNeighbor = (vs->mpi_rank + shift) % vs->mpi_size;
+        to = (vs->mpi_rank - shift + vs->mpi_size) % vs->mpi_size;
+        from = (vs->mpi_rank + shift) % vs->mpi_size;
         
         recvCount = vs->block_Indices[shift_next] - vs->block_Indices[shift];
-        MPI_Sendrecv(vs->bitArray, vs->block_Indices[shift_next - shift], MPI_UNSIGNED_LONG_LONG, sendNeighbor, 101,
-                     vs->bitArray + vs->block_Indices[shift], recvCount, MPI_UNSIGNED_LONG_LONG, recvNeighbor,101,
+        MPI_Sendrecv(vs->bitArray, vs->block_Indices[shift_next - shift], MPI_UNSIGNED_LONG_LONG, to, 101,
+                     vs->bitArray + vs->block_Indices[shift], recvCount, MPI_UNSIGNED_LONG_LONG, from,101,
                      vs->MPI_COMM, MPI_STATUS_IGNORE);
     }
-    vs->isdense = true;
 };
 
 void Vertexset_Allreduce_Naive(Vertexset* const vs, const int VERTEXSET_OPERATION){
@@ -692,29 +719,21 @@ void Vertexset_Allreduce_Dense(Vertexset* const vs, const int VERTEXSET_OPERATIO
         
 
         // do reduce_scatter
-        int sendNeighbor;
-        int recvNeighbor;
+        int to;
+        int from;
         int recvCount;
         int nElements;
         int startIndex;
-        int shift = vs->mpi_size;
-        int shift_old, shift_next;
+        int shift = Vertexset_nearestLog2(vs->mpi_size);
+        int shift_old = vs->mpi_size;
+        int shift_next;
         for (int i = 0; i < iterations; i++) {
-            // update shift
-            if (i==0){
-                shift_old = vs->mpi_size;
-                shift = Vertexset_nearestLog2(vs->mpi_size);
-                if(vs->mpi_rank == 0) printf("first iteration shift:%d\n", Vertexset_nearestLog2(vs->mpi_size));
-            }else{
-                shift_old = shift;
-                shift = shift - shift/2; // ceil(shift/2)
-            }
-            
+            // Save skip sequence
             skipSequence[iterations - i - 1] = shift;
-            
+
             // find communication neighbors
-            sendNeighbor = (vs->mpi_rank + shift) % vs->mpi_size;
-            recvNeighbor = (vs->mpi_rank - shift + vs->mpi_size) % vs->mpi_size;
+            to = (vs->mpi_rank + shift) % vs->mpi_size;
+            from = (vs->mpi_rank - shift + vs->mpi_size) % vs->mpi_size;
             
             // find start indices of dense send
             startIndex = vs->block_Indices[shift];
@@ -725,12 +744,17 @@ void Vertexset_Allreduce_Dense(Vertexset* const vs, const int VERTEXSET_OPERATIO
             // find the size that is recieved          
             recvCount = vs->block_Indices[shift_old - shift];
  
-            MPI_Sendrecv(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, sendNeighbor, 200,
-                         vs->bitBuffer, recvCount, MPI_UNSIGNED_LONG_LONG, recvNeighbor, 200, vs->MPI_COMM, MPI_STATUS_IGNORE);
+            MPI_Sendrecv(vs->bitArray + startIndex, nElements, MPI_UNSIGNED_LONG_LONG, to, 200,
+                         vs->bitBuffer, recvCount, MPI_UNSIGNED_LONG_LONG, from, 200, vs->MPI_COMM, MPI_STATUS_IGNORE);
             // do reduction           
             for (int i = 0; i < recvCount; i++) {
                 vs->bitArray[i] |= vs->bitBuffer[i];
             }
+
+            // update shift
+            shift_old = shift;
+            shift >>= 1; // exactly halfing
+            
         }
         
 
@@ -741,40 +765,18 @@ void Vertexset_Allreduce_Dense(Vertexset* const vs, const int VERTEXSET_OPERATIO
             shift_next = skipSequence[i+1];        
             
             // find communication neighbors
-            sendNeighbor = (vs->mpi_rank - shift + vs->mpi_size) % vs->mpi_size;
-            recvNeighbor = (vs->mpi_rank + shift) % vs->mpi_size;
+            to = (vs->mpi_rank - shift + vs->mpi_size) % vs->mpi_size;
+            from = (vs->mpi_rank + shift) % vs->mpi_size;
             
             recvCount = vs->block_Indices[shift_next] - vs->block_Indices[shift];
-            MPI_Sendrecv(vs->bitArray, vs->block_Indices[shift_next - shift], MPI_UNSIGNED_LONG_LONG, sendNeighbor, 101,
-                        vs->bitArray + vs->block_Indices[shift], recvCount, MPI_UNSIGNED_LONG_LONG, recvNeighbor,101,
+            MPI_Sendrecv(vs->bitArray, vs->block_Indices[shift_next - shift], MPI_UNSIGNED_LONG_LONG, to, 101,
+                        vs->bitArray + vs->block_Indices[shift], recvCount, MPI_UNSIGNED_LONG_LONG, from,101,
                         vs->MPI_COMM, MPI_STATUS_IGNORE);
         }
         vs->isdense = true; 
     }
-    
-
 };
 
-
-int Vertexset_reverseBits(int num, int N_bits){
-    int reverse_num = 0;
-    for (int i = 0; i < N_bits; i++){
-        if ((num & (1<<i))) {
-            reverse_num |= 1 << (N_bits - 1 - i);
-        }
-    }
-    return reverse_num;
-    
-}
-
-int Vertexset_nearestLog2(int p){
-    int count = 0;
-    while (p != 1) {
-        p >>= 1;
-        count++;
-    }
-    return (1<<count);
-}
 
 void Vertexset_Allreduce_Dense_ReverseBits(Vertexset* const vs, const int VERTEXSET_OPERATION){
     assert(VERTEXSET_OPERATION == VERTEXSET_OR); // no other operator implemented
@@ -862,14 +864,15 @@ void Vertexset_Allgather(Vertexset* vs){
     int nBlocks;
     MPI_Request req;
     MPI_Status status;
-    int tail = vs->mpi_size;
     int recvCount;
+    int sizeBuff;
+    int lastBlockSize;
+    int tail = vs->mpi_size;
     bool inBuff = false;
-    int sizeBuff=0;
     int sizeSparse = vs->sizeSparse;
 
-    // add blockinfo to sparse array
-    vs->sparseArray[sizeSparse] = sizeSparse;
+    // set size of last block
+    lastBlockSize = sizeSparse;
 
     while (shift >=1 ) {
         to = (vs->mpi_rank - shift + vs->mpi_size) % vs->mpi_size;
@@ -881,35 +884,30 @@ void Vertexset_Allgather(Vertexset* vs){
                 // buffered block must be copied into pile
                 memcpy(vs->sparseArray +  sizeSparse, vs->sparseBuffer, sizeBuff*sizeof(uint32_t));
                 sizeSparse += sizeBuff;
+                lastBlockSize = sizeBuff;
                 inBuff = false;
             }
-            MPI_Isend(vs->sparseArray, sizeSparse + 1, MPI_UINT32_T, to, 100, vs->MPI_COMM, &req);
-            MPI_Probe(from, 100, vs->MPI_COMM, &status);
-            MPI_Get_count(&status, MPI_UINT32_T, &recvCount);
-            MPI_Recv(vs->sparseArray + sizeSparse, recvCount, MPI_UINT32_T, from, 100, vs->MPI_COMM, MPI_STATUS_IGNORE);
-            MPI_Wait(&req, MPI_STATUS_IGNORE);
-            sizeSparse += recvCount-1;
-
             tail -= shift;
         } else {
             // tail is smaller or equal to shift and must be buffered
             if (!inBuff) {
                 // last block is is copied from pile to buffer
-                sizeBuff = vs->sparseArray[sizeSparse];
+                sizeBuff = lastBlockSize;
                 memcpy(vs->sparseBuffer, vs->sparseArray + sizeSparse - sizeBuff, sizeBuff*sizeof(uint32_t));
                 sizeSparse -= sizeBuff;
                 inBuff=true;
             }
 
-            MPI_Isend(vs->sparseArray, sizeSparse+1, MPI_UINT32_T, to, 100, vs->MPI_COMM, &req);
-            MPI_Probe(from, 100, vs->MPI_COMM, &status);
-            MPI_Get_count(&status, MPI_UINT32_T, &recvCount);
-            MPI_Recv(vs->sparseArray + sizeSparse, recvCount, MPI_UINT32_T, from, 100, vs->MPI_COMM, MPI_STATUS_IGNORE);
-            sizeSparse += recvCount-1;
         }
 
+        MPI_Isend(vs->sparseArray, sizeSparse, MPI_UINT32_T, to, lastBlockSize, vs->MPI_COMM, &req);
+        MPI_Probe(from, MPI_ANY_TAG, vs->MPI_COMM, &status);
+        MPI_Get_count(&status, MPI_UINT32_T, &recvCount);
+        MPI_Recv(vs->sparseArray + sizeSparse, recvCount, MPI_UINT32_T, from, MPI_ANY_TAG, vs->MPI_COMM, MPI_STATUS_IGNORE);
+        sizeSparse += recvCount;
+        lastBlockSize = status.MPI_TAG;
         
-        shift /= 2;
+        shift >>= 1; //exactly halfign
     }
 
     // copy block on pile, if it is buffered after last iteration
