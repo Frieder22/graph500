@@ -461,6 +461,9 @@ bool test_Vertexset_dense(){
 bool test_Allgather_single(void (*allgatherFunc) (Vertexset*), int setSize, int filling){
     bool isCorrect = true;
     bool verbose = false;
+    bool debug = false;
+
+    if (debug && rank==0) printf(ANSI_RED"DEBUG mode!!\n"ANSI_RESET);
 
     int insertionsTotal = filling;
 
@@ -471,15 +474,28 @@ bool test_Allgather_single(void (*allgatherFunc) (Vertexset*), int setSize, int 
 
     assert(insertionsTotal <= vs.sizeCrit);
 
-    // Fill arrays with random numbers
     int num;
-    for (size_t i = 0; i < insertionsTotal; i++) {
-        num = rand()%setSize;
-        control[i] = num;
-        if (i%size==rank) {
-            Vertexset_Add(&vs, num);
+    if (debug) {
+        // Fill arrays with only own rank ID
+        insertionsTotal = size;
+        for (size_t i = 0; i < size; i++) {
+            num = i%size;
+            control[i] = num;
+            if (rank == num) {
+                Vertexset_Add(&vs, num);
+            }
+        }
+    } else {
+        // Fill arrays with random numbers
+        for (size_t i = 0; i < insertionsTotal; i++) {
+            num = rand()%setSize;
+            control[i] = num;
+            if (i%size==rank) {
+                Vertexset_Add(&vs, num);
+            }
         }
     }
+    
 
     // perform Allgather
     (*allgatherFunc) (&vs);
@@ -490,6 +506,10 @@ bool test_Allgather_single(void (*allgatherFunc) (Vertexset*), int setSize, int 
 
     // compare elements
     for (size_t i = 0; i < insertionsTotal; i++){
+        if (verbose && rank==0) {
+            printf("arr, control: %d, %d\n", vs.sparseArray[i], control[i]);
+        }
+        
         if (vs.sparseArray[i]!= control[i]) {
             isCorrect=false;
         }
@@ -498,6 +518,9 @@ bool test_Allgather_single(void (*allgatherFunc) (Vertexset*), int setSize, int 
     //compare size of lists
     if (vs.sizeSparse != insertionsTotal) {
         isCorrect = false;
+        if (rank==0) {
+            printf("Size doesn't match up!!!\n");
+        }        
     }
     
     
@@ -522,10 +545,10 @@ bool test_Allgather_single(void (*allgatherFunc) (Vertexset*), int setSize, int 
 
 bool test_Allgather_batch(void (*allgatherFunc) (Vertexset*)){
     bool isCorrect = true;
-    isCorrect &= test_Allgather_single(Vertexset_Allgather, 500000, size*2+4);
-    isCorrect &= test_Allgather_single(allgatherFunc, 500000, size +7);
-    //isCorrect &= test_Allgather_single(Vertexset_Allgather, 5000, 5);
-    //isCorrect &= test_Allgather_single(Vertexset_Allgather, 200, 2);
+    isCorrect &= test_Allgather_single(allgatherFunc, 500000, size*2+4);
+    isCorrect &= test_Allgather_single(allgatherFunc, 500000, size + 7);
+    isCorrect &= test_Allgather_single(allgatherFunc, 500000, size + 1);
+    isCorrect &= test_Allgather_single(allgatherFunc, 1000000, 10*size + 3);
 
     if (rank==0) {
         if (isCorrect) {
