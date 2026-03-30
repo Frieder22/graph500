@@ -865,26 +865,25 @@ void Vertexset_Allgather(Vertexset* vs){
     MPI_Request req;
     MPI_Status status;
     int recvCount;
-    int sizeBuff;
     int lastBlockSize;
+    int sizeBuff=0;
     int tail = vs->mpi_size;
     bool inBuff = false;
     int sizeSparse = vs->sizeSparse;
 
     // set size of last block
-    lastBlockSize = sizeSparse;
-
+    vs->sparseArray[sizeSparse] = sizeSparse;
     while (shift >=1 ) {
         to = (vs->mpi_rank - shift + vs->mpi_size) % vs->mpi_size;
         from = (vs->mpi_rank + shift) % vs->mpi_size;
-        
-        if (tail>shift || tail == 0 ) {
+        if (tail>shift || tail == 0) {
             // tail is bigger than shift and must be sent
             if (inBuff) {
                 // buffered block must be copied into pile
-                memcpy(vs->sparseArray +  sizeSparse, vs->sparseBuffer, sizeBuff*sizeof(uint32_t));
+                MPI_Wait(&req, MPI_STATUS_IGNORE);
+                memcpy(vs->sparseArray +  sizeSparse, vs->sparseBuffer, (sizeBuff+1)*sizeof(uint32_t));
+                
                 sizeSparse += sizeBuff;
-                lastBlockSize = sizeBuff;
                 inBuff = false;
             }
             tail -= shift;
@@ -892,33 +891,52 @@ void Vertexset_Allgather(Vertexset* vs){
             // tail is smaller or equal to shift and must be buffered
             if (!inBuff) {
                 // last block is is copied from pile to buffer
-                sizeBuff = lastBlockSize;
-                memcpy(vs->sparseBuffer, vs->sparseArray + sizeSparse - sizeBuff, sizeBuff*sizeof(uint32_t));
+                sizeBuff = vs->sparseArray[sizeSparse];
+                memcpy(vs->sparseBuffer, vs->sparseArray + sizeSparse - sizeBuff, (sizeBuff+1)*sizeof(uint32_t));
                 sizeSparse -= sizeBuff;
                 inBuff=true;
             }
-
+            
         }
 
-        MPI_Isend(vs->sparseArray, sizeSparse, MPI_UINT32_T, to, lastBlockSize, vs->MPI_COMM, &req);
+        
+        MPI_Isend(vs->sparseArray, sizeSparse + 1, MPI_UINT32_T, to, 100, vs->MPI_COMM, &req);
         MPI_Probe(from, MPI_ANY_TAG, vs->MPI_COMM, &status);
         MPI_Get_count(&status, MPI_UINT32_T, &recvCount);
-        MPI_Recv(vs->sparseArray + sizeSparse, recvCount, MPI_UINT32_T, from, MPI_ANY_TAG, vs->MPI_COMM, MPI_STATUS_IGNORE);
-        sizeSparse += recvCount;
-        lastBlockSize = status.MPI_TAG;
+        MPI_Recv(vs->sparseArray + sizeSparse + 1, recvCount, MPI_UINT32_T, from, 100, vs->MPI_COMM, MPI_STATUS_IGNORE);
         
-        shift >>= 1; //exactly halfign
-    }
+        if (inBuff) {
+            // overwrite old lastBlockSize with valid element
+            vs->sparseArray[sizeSparse] = vs->sparseArray[sizeSparse + recvCount - 1];
+            
+            // place new lastBlockSize in correct position
+            vs->sparseArray[sizeSparse + recvCount - 1] = vs->sparseArray[sizeSparse + recvCount];
+        } else {
+            // find new last block size of reveived data
+            lastBlockSize = vs->sparseArray[sizeSparse + recvCount];
 
+            // overwrite old lastBlockSize with valid element that is not from new last block
+            vs->sparseArray[sizeSparse] = vs->sparseArray[sizeSparse + recvCount - lastBlockSize - 1];
+            
+            // overwrite valid element that is not from new last block with element from new last block
+            vs->sparseArray[sizeSparse + recvCount - lastBlockSize - 1] = vs->sparseArray[sizeSparse + recvCount - 1];
+
+            // place new lastBlockSize in correct position
+            vs->sparseArray[sizeSparse + recvCount - 1] = vs->sparseArray[sizeSparse + recvCount]; 
+        }
+        
+        
+        sizeSparse += recvCount - 1;
+        shift >>= 1; //exactly halfing
+    }
+    
     // copy block on pile, if it is buffered after last iteration
     if (inBuff) {
         // buffered block must be copied into pile
-        memcpy(vs->sparseArray +  sizeSparse, vs->sparseBuffer, (sizeBuff+1)*sizeof(uint32_t));
+        memcpy(vs->sparseArray +  sizeSparse, vs->sparseBuffer, (sizeBuff)*sizeof(uint32_t));
         sizeSparse += sizeBuff;
         inBuff = false;
-    }
-
-    
+    }    
     vs->sizeSparse = sizeSparse;
 
 
