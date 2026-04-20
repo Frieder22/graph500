@@ -1,0 +1,14 @@
+{
+    "experiment": "E1",
+    "funcType": "Allgather",
+    "vsFunc": "EXACT_HALFING",
+    "setSize": 1000000,
+    "filling": [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2],
+    "nRepetitions": 300,
+    "mpilib": ["openMPI", "intelMPI", "MPICH"],
+    "nNodes": 32,
+    "perNode": 32,
+    "xAxis": "filling",
+    "yAxis" : "runtime",
+    "plotGraphs" : "mpilib"
+}

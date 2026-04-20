@@ -870,7 +870,7 @@ void Vertexset_Allreduce_Dense_ReverseBits(Vertexset* const vs, const int VERTEX
 };
 
 
-void Vertexset_Allgather(Vertexset* vs){
+void Vertexset_Allgather(Vertexset* vs, int  VERTEXSET_OPERATION){
     // safety measure
     if (vs->mpi_size < 2) {
         return;

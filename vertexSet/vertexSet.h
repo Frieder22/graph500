@@ -145,7 +145,7 @@ void Vertexset_Allreduce_Naive(Vertexset* vs, int VERTEXSET_OPERATION);
 
 void Vertexset_Allreduce_Dense(Vertexset* vs, int VERTEXSET_OPERATION);
 
-void Vertexset_Allgather(Vertexset* vs);
+void Vertexset_Allgather(Vertexset* vs, int  VERTEXSET_OPERATION);
 
 /**
  * Prints the elements saved in Vertex set. At most 30 elements
