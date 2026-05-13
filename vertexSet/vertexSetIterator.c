@@ -13,7 +13,7 @@ void vertexSetIterator_Init(vertexSetIterator* const it, Vertexset* const vs) {
     if (it->isdense) {
         it->wordIdx = 0;
         it->wordShift = 0;
-        if (vs->approx_halfing) {
+        if (vs->shiftPattern) {
             it->word = vs->bitArray[(vs->size_bitarray - vs->indexShift)%vs->size_bitarray];
         } else {
             it->word = vs->bitArray[0];
@@ -27,7 +27,7 @@ void vertexSetIterator_Init(vertexSetIterator* const it, Vertexset* const vs) {
 
 bool vertexSetIterator_Has_next(vertexSetIterator* const it){
     if (it->isdense) {
-        if (!it->vs->approx_halfing){
+        if (!it->vs->shiftPattern){
             for ( size_t i = it->wordIdx; i < it->vs->size_bitarray; i++){
                 // find a word thats not 0
                 if (it->vs->bitArray[i] != 0ULL){
@@ -101,7 +101,7 @@ void vertexSetIterator_Reset(vertexSetIterator* const it){
         Vertexset *vs = it->vs;
         it->wordIdx = 0;
         it->wordShift = 0;
-        if (vs->approx_halfing) {
+        if (vs->shiftPattern) {
             it->word = vs->bitArray[(vs->size_bitarray - vs->indexShift)%vs->size_bitarray];
         } else {
             it->word = vs->bitArray[0];

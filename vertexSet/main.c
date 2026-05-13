@@ -80,11 +80,11 @@ int main(int argc, char *argv[]) {
     }
     */
     Vertexset vs;
-    Vertexset_Init(&vs, 512, MPI_COMM_WORLD);
+    Vertexset_Init(&vs, 512, MPI_COMM_WORLD, true);
 
     Vertexset_Add(&vs, rank);
 
-    Vertexset_Allgather(&vs);
+    Vertexset_Allgather_Shift(&vs, VERTEXSET_OR);
 
     Vertexset_PrintSet(&vs);
 

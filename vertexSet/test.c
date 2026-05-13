@@ -34,24 +34,30 @@ void printTestInfo(int testnumber){
         case ITERATOR:
             printf("Testing functionality of Iterator functions.\n");
             break;
-        case EXACT_HALFING:
+        case UNION_BUTTERFLY:
             printf("Testing functionality of Exact Halfing Reduce.\n");
             break;
-        case APROXIMATE_HALFING:
+        case UNION_SHIFT:
             printf("Testing functionality of Aproximate Halfing Reduce.\n");
             break;
-        case NAIVE:
+        case UNION_NAIVE:
             printf("Testing functionality of Naive Reduce.\n");
             break;
-        case DENSE:
+        case ALLREDUCE_BUTTERFLY:
             printf("Testing functionality of Dense Reduce.\n");
             break;
         case VERTEXSET_TEST:
             printf("Testing functionality of Vertexset functions.\n");
             break;
-        case ALLGATHER:
-            printf("Testing functionality of Allgather.\n");
-            break;     
+        case ALLGATHER_SHIFT:
+            printf("Testing functionality of Allgather_Shift.\n");
+            break;
+        case ALLGATHER_BUTTERFLY:
+            printf("Testing functionality of Allgather_Butterfly.\n");
+            break;
+        case ALLGATHER_BUTTERFLY_REVERSE:
+            printf("Testing functionality of Allgather_Butterfly_Reverse.\n");
+            break;
 
         default:
             printf(ANSI_RED "Print function doesn't know this testcase!\n" ANSI_RESET);
@@ -66,10 +72,19 @@ void printTestInfo(int testnumber){
     }
 }
 
+int getFuncID(void (*func) (Vertexset*, int)){
+    for (int i = 1; i < 5; i++) {
+        if (getVertexsetFunc(i) == func) {
+            return i;
+        }
+    }
+}
+
 void test_Iterator_sparse(){
     printf("Testing Iterator sparse...\n");
+    bool shiftPattern =  (size & (size - 1)) != 0;
     Vertexset vs;
-    Vertexset_Init(&vs, 500, MPI_COMM_WORLD);
+    Vertexset_Init(&vs, 500, MPI_COMM_WORLD, shiftPattern);
 
     uint32_t addedVerts[] = {10, 65, 6,0, 9, 7, 499};
     int n = sizeof(addedVerts) / sizeof(addedVerts[0]);
@@ -112,8 +127,10 @@ void test_Iterator_sparse(){
 void test_Iterator_dense(){
     printf("Testing Iterator dense...\n");
     Vertexset vs, control;
-    Vertexset_Init(&vs, 500, MPI_COMM_WORLD);
-    Vertexset_Init(&control, 500, MPI_COMM_WORLD);
+    bool shiftPattern =  (size & (size - 1)) != 0;
+
+    Vertexset_Init(&vs, 500, MPI_COMM_WORLD, shiftPattern);
+    Vertexset_Init(&control, 500, MPI_COMM_WORLD, shiftPattern);
 
     uint32_t addedVerts[] = {10, 7, 12, 32, 0, 333, 499};
     int n = sizeof(addedVerts) / sizeof(addedVerts[0]);
@@ -161,25 +178,40 @@ bool test_Allreduce_single(void (*reduceFunc) (Vertexset*, int), int setSize, fl
 
     int insertions = (int) setSize * filling;
 
+    int funcId = getFuncID(reduceFunc);  
+
     Vertexset vs, control;
-    Vertexset_Init(&vs, setSize, MPI_COMM_WORLD);
-    Vertexset_Init(&control, setSize, MPI_COMM_WORLD);
+    bool shiftPattern = getCommPattern(funcId);
+
+    Vertexset_Init(&vs, setSize, MPI_COMM_WORLD, shiftPattern);
+    Vertexset_Init(&control, setSize, MPI_COMM_WORLD, shiftPattern);
     
     Vertexset_TransformToDense(&control);
     
     // all ranks have same seed
     srand(2);
     int num;
-    for (size_t i = 0; i < insertions; i++) {
-        num = rand()%setSize;
-        Vertexset_Add(&control, num);
-        if (i%size==rank) {
-            Vertexset_Add(&vs, num);
+    if (filling >= 0){
+        for (size_t i = 0; i < insertions; i++) {
+            num = rand()%setSize;
+            Vertexset_Add(&control, num);
+            if (i%size==rank) {
+                Vertexset_Add(&vs, num);
+            }
         }
+    } else {
+        for (size_t i = 0; i < 50000; i++) {
+            num = rand()%setSize;
+            Vertexset_Add(&control, num);
+            if (i%size==rank) {
+                Vertexset_Add(&vs, num);
+            }
+        }
+        Vertexset_TransformToDense(&vs);
     }
     
     //Allreduce_Dense only works with dense arrays
-    if(reduceFunc == Vertexset_Allreduce_Dense){
+    if(reduceFunc == Vertexset_Allreduce_Butterfly){
         Vertexset_TransformToDense(&vs);
     }
 
@@ -263,6 +295,7 @@ bool test_Allreduce_batch(void (*reduceFunc) (Vertexset*, int)){
     isCorrect &= test_Allreduce_single(reduceFunc, 63, 0.3);
     isCorrect &= test_Allreduce_single(reduceFunc, 64, 0.3);
     isCorrect &= test_Allreduce_single(reduceFunc, 65, 0.3);
+    isCorrect &= test_Allreduce_single(reduceFunc, 1000000000, -1);
     isCorrect &= test_Allreduce_single(reduceFunc, 1<<25, 0.3);  
     if (rank==0) {
         if (isCorrect) {
@@ -287,7 +320,8 @@ bool test_Vertexset_sparse(){
 
     // Init of VS
     Vertexset vs;
-    Vertexset_Init(&vs, maxsize, MPI_COMM_WORLD);
+    bool shiftPattern =  (size & (size - 1)) != 0;
+    Vertexset_Init(&vs, maxsize, MPI_COMM_WORLD, shiftPattern);
     
     // reference buffer
     uint32_t added[n1 + n2];
@@ -372,7 +406,8 @@ bool test_Vertexset_dense(){
 
     // Init of VS
     Vertexset vs;
-    Vertexset_Init(&vs, maxsize, MPI_COMM_WORLD);
+    bool shiftPattern =  (size & (size - 1)) != 0;
+    Vertexset_Init(&vs, maxsize, MPI_COMM_WORLD, shiftPattern);
 
     // set to dense
     vs.isdense = 1;
@@ -458,7 +493,7 @@ bool test_Vertexset_dense(){
     }
 }
 
-bool test_Allgather_single(void (*allgatherFunc) (Vertexset*), int setSize, int filling){
+bool test_Allgather_single(void (*allgatherFunc) (Vertexset*, int), int setSize, int filling){
     bool isCorrect = true;
     bool verbose = false;
     bool debug = false;
@@ -466,9 +501,9 @@ bool test_Allgather_single(void (*allgatherFunc) (Vertexset*), int setSize, int 
     if (debug && rank==0) printf(ANSI_RED"DEBUG mode!!\n"ANSI_RESET);
 
     int insertionsTotal = filling;
-
     Vertexset vs;
-    Vertexset_Init(&vs, setSize, MPI_COMM_WORLD);
+    bool shiftPattern = getCommPattern(getFuncID(allgatherFunc));
+    Vertexset_Init(&vs, setSize, MPI_COMM_WORLD, shiftPattern);
     uint32_t* control;
     control = (uint32_t*) malloc(insertionsTotal*sizeof(uint32_t));
 
@@ -498,7 +533,7 @@ bool test_Allgather_single(void (*allgatherFunc) (Vertexset*), int setSize, int 
     
 
     // perform Allgather
-    (*allgatherFunc) (&vs);
+    (*allgatherFunc) (&vs, VERTEXSET_OR);
 
     // sort array and controll 
     qsort(vs.sparseArray, insertionsTotal, sizeof(uint32_t), comp);
@@ -511,6 +546,7 @@ bool test_Allgather_single(void (*allgatherFunc) (Vertexset*), int setSize, int 
         }
         
         if (vs.sparseArray[i]!= control[i]) {
+            //printf("rank: %d, tested: %d, control: %d", rank, vs.sparseArray[i], control[i]);
             isCorrect=false;
         }
     }
@@ -543,12 +579,13 @@ bool test_Allgather_single(void (*allgatherFunc) (Vertexset*), int setSize, int 
 }
 
 
-bool test_Allgather_batch(void (*allgatherFunc) (Vertexset*)){
+bool test_Allgather_batch(void (*allgatherFunc) (Vertexset*, int)){
     bool isCorrect = true;
     isCorrect &= test_Allgather_single(allgatherFunc, 500000, size*2+4);
     isCorrect &= test_Allgather_single(allgatherFunc, 500000, size + 7);
     isCorrect &= test_Allgather_single(allgatherFunc, 500000, size + 1);
     isCorrect &= test_Allgather_single(allgatherFunc, 1000000, 10*size + 3);
+    isCorrect &= test_Allgather_single(allgatherFunc, 50000000, 1000000);
 
     if (rank==0) {
         if (isCorrect) {
@@ -586,21 +623,21 @@ int main(int argc, char *argv[]){
             test_Iterator_sparse();
             break;
         
-        case EXACT_HALFING: // Test Exact halfing
+        case UNION_BUTTERFLY: // Test Exact halfing
             assert((size & (size - 1)) == 0); // only works for ranks = 2^k
-            test_Allreduce_batch(Vertexset_Allreduce_Exact_Halfing);
+            test_Allreduce_batch(Vertexset_Union_Butterfly);
             break;
 
-        case APROXIMATE_HALFING: // Test Approximate halfing
-            test_Allreduce_batch(Vertexset_Allreduce_Approximate_Halfing);
+        case UNION_SHIFT: // Test Approximate halfing
+            test_Allreduce_batch(Vertexset_Union_Shift);
             break;
 
-        case NAIVE: // Test allreduce using ring topology
-            test_Allreduce_batch(Vertexset_Allreduce_Naive);
+        case UNION_NAIVE: // Test allreduce using ring topology
+            test_Allreduce_batch(Union_Allreduce_Naive);
             break;
 
-        case DENSE: // Test dense allreduce
-            test_Allreduce_batch(Vertexset_Allreduce_Dense);
+        case ALLREDUCE_BUTTERFLY: // Test dense allreduce
+            test_Allreduce_batch(Vertexset_Allreduce_Butterfly);
             break;
 
         case VERTEXSET_TEST: //Test functionality of vertexset
@@ -608,8 +645,18 @@ int main(int argc, char *argv[]){
             test_Vertexset_dense();
             break;
 
-        case ALLGATHER:
-            test_Allgather_batch(Vertexset_Allgather);
+        case ALLGATHER_SHIFT:
+            test_Allgather_batch(Vertexset_Allgather_Shift);
+            break;
+
+        case ALLGATHER_BUTTERFLY:
+            test_Allgather_batch(Vertexset_Allgather_Butterfly);
+            break;
+
+        case ALLGATHER_BUTTERFLY_REVERSE:
+            test_Allgather_batch(Vertexset_Allgather_Butterfly_ReverseBits);
+            break;
+
         default:
             break;
     }

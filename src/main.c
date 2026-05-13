@@ -31,6 +31,8 @@
 #include <stdint.h>
 #include <inttypes.h>
 
+#define N_BFS 1
+
 int isisolated(int64_t v);
 static int compare_doubles(const void* a, const void* b) {
 	double aa = *(const double*)a;
@@ -161,7 +163,7 @@ int main(int argc, char** argv) {
 	/* Make the raw graph edges. */
 	/* Get roots for BFS runs, plus maximum vertex with non-zero degree (used by
 	 * validator). */
-	int num_bfs_roots = 64;
+	int num_bfs_roots = N_BFS;
 	int64_t* bfs_roots = (int64_t*)xmalloc(num_bfs_roots * sizeof(int64_t));
 
 	double make_graph_start = MPI_Wtime();

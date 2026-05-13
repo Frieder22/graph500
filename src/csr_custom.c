@@ -6,7 +6,7 @@ void divideTuplegraph_divisible(const tuple_graph* const tg, tuple_graph* const 
     // Assumption to work properly: rank 0 holds correct edge list
 	//								every rank knows the number of global edges
 
-	// Only works, if there are less than 2147483647 edges (2^32)
+	// Only works, if there are less than 2147483647 edges (2^31)
 	assert(tg->nglobaledges <= INT_MAX);
 
 	// find number of elements and displacements

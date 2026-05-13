@@ -1,5 +1,5 @@
-#if !defined(VERTEXSET)
-#define VERTEXSET
+#if !defined(VERTEXSETSHIFT)
+#define VERTEXSETSHIFT
 
 #include <stddef.h>
 #include <stdint.h>
@@ -12,7 +12,7 @@ typedef struct Vertexset{
     size_t maxsize;
     size_t sizeCrit;
     bool isdense;
-    bool shiftPattern;
+    bool approx_halfing;
     
     // Data for Bitarray
     unsigned long long *bitArray;
@@ -20,7 +20,7 @@ typedef struct Vertexset{
     int size_bitarray;
     
     // Data for sparse array
-    size_t sizeSparse;
+    int sizeSparse;
     uint32_t *sparseArray;
     uint32_t *sparseBuffer;
     int *sizesAll;
@@ -39,12 +39,6 @@ typedef struct Vertexset{
     int indexShift;
 } Vertexset;
 
-typedef enum critSizeStrategies {
-    CRITSIZE_MAX,
-    CRITSIZE_MIN,
-    CRITSIZE_MEAN
-} critSizeStrategies;
-
 /**
  * Initializes Vertex Set object.
  * Runs in O(n)
@@ -53,11 +47,7 @@ typedef enum critSizeStrategies {
  * @param maxsize Maximum number of vertices, that can be added
  * @param MPI_COMM MPI communicator, where reduce operation are possible
  */
-void Vertexset_Init(Vertexset* const vs, const uint32_t maxsize, const MPI_Comm MPI_COMM, bool shiftPattern);
-
-void Vertexset_SetCritsizeStrategy(Vertexset* const vs, critSizeStrategies citsizeStrategy);
-
-void Vertexset_SetCritsize(Vertexset* const vs, int critSize);
+void Vertexset_Init(Vertexset* const vs, const uint32_t maxsize, const MPI_Comm MPI_COMM);
 
 /**
  * Adds a vertex to vertexset.
@@ -104,6 +94,28 @@ bool Vertexset_TransformToDense(Vertexset* vs);
  */
 bool Vertexset_TransformToSparse(Vertexset* vs);
 
+/**
+ * Performs an Allreduce operation with vertex sets from
+ * other ranks.
+ * Time complexities:
+ * no guarantee
+ * @param vs corresponding Vertexset object 
+ * @param VERTEXSET_OPERATION which logical operation should be applied
+ */
+void Vertexset_Allreduce(Vertexset* vs, int VERTEXSET_OPERATION);
+
+/**
+ * Performs an Allreduce operation with vertex sets from
+ * other ranks. Only sparse or dense representation are used during
+ * the communciation. All ranks must have vs in the same kind of
+ * representation.
+ * Time complexities:
+ * Dense: O(Allreduce(n))
+ * Sparse: O(Allgather(k))
+ * @param vs corresponding Vertexset object 
+ * @param VERTEXSET_OPERATION which logical operation should be applied
+ */
+void Vertexset_Allreduce_Pure(Vertexset* vs, int VERTEXSET_OPERATION);
 
 /**
  * Performs an Allreduce operation with vertex sets from
@@ -133,14 +145,6 @@ void Union_Allreduce_Naive(Vertexset* vs, int VERTEXSET_OPERATION);
 
 void Vertexset_Allreduce_Butterfly(Vertexset* vs, int VERTEXSET_OPERATION);
 
-void Vertexset_Allreduce_Butterfly_ReverseBits(Vertexset* const vs, const int VERTEXSET_OPERATION);
-
-void Vertexset_Allreduce_Shift(Vertexset* const vs, const int VERTEXSETOPERATION);
-
-void Vertexset_Allgather_Butterfly(Vertexset* vs, int VERTEXSET_OPERATION);
-
-void Vertexset_Allgather_Butterfly_ReverseBits(Vertexset* vs, int VERTEXSET_OPERATION);
-
 void Vertexset_Allgather_Shift(Vertexset* vs, int  VERTEXSET_OPERATION);
 
 /**
@@ -161,4 +165,4 @@ void Vertexset_Deinit(Vertexset* vs);
 #define VERTEXSET_AND 1
 #define VERTEXSET_XOR 2
 
-#endif // VERTEXSET
+#endif // VERTEXSETSHIFT

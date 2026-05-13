@@ -76,7 +76,16 @@ void make_graph_data_structure(const tuple_graph* const tg) {
 	for(i=0;i<g.nlocalverts;i++) q1[i]=0,q2[i]=0; //touch memory
 	visited = xmalloc(visited_size*sizeof(unsigned long));
 }
-
+void printPreds(int64_t *preds){
+	if (rank==0) {
+		printf("preds:\n");
+		for (size_t i = 0; i < g.nglobalverts; i++) {
+			printf("%d ,", preds[i]);
+		}
+		printf("\n");
+	}
+	
+}
 void run_bfs(int64_t root, int64_t* pred) {
 	int64_t nvisited;
 	long sum;
@@ -98,10 +107,6 @@ void run_bfs(int64_t root, int64_t* pred) {
 
 	// While there are vertices in current level
 	while(sum) {
-#ifdef DEBUGSTATS
-		double t0=aml_time();
-		nbytes_sent=0; nbytes_rcvd=0;
-#endif
 		//for all vertices in current level send visit AMs to all neighbours
 		for(i=0;i<qc;i++)
 			for(j=rowstarts[q1[i]];j<rowstarts[q1[i]+1];j++)
@@ -115,11 +120,6 @@ void run_bfs(int64_t root, int64_t* pred) {
 		nvisited+=sum;
 
 		q2c=0;
-#ifdef DEBUGSTATS
-		aml_long_allsum(&nbytes_sent);
-		t0-=aml_time();
-		if(!my_pe()) printf (" --lvl%d : %lld(%lld,%3.2f) visited in %5.2fs, network aggr %5.2fGb/s\n",lvl++,sum,nvisited,((double)nvisited/(double)g.notisolated)*100.0,-t0,-(double)nbytes_sent*8.0/(1.e9*t0));
-#endif
 	}
 	aml_barrier();
 

@@ -33,16 +33,16 @@ void fillInFunctionName(char* filepath, void (*reduceFunc) (Vertexset*, int)){
     strcat(filepath, datafolder);
 
     // name file according to function
-    if (reduceFunc == Vertexset_Allreduce_Exact_Halfing) {
+    if (reduceFunc == Vertexset_Union_Butterfly) {
         char filename[] = "exact_Halfing";
         strcat(filepath, filename);
-    } else if (reduceFunc == Vertexset_Allreduce_Approximate_Halfing) {
+    } else if (reduceFunc == Vertexset_Union_Shift) {
         char filename[] = "approx_Halfing";
         strcat(filepath, filename);
-    } else if (reduceFunc == Vertexset_Allreduce_Naive) {
+    } else if (reduceFunc == Union_Allreduce_Naive) {
         char filename[] = "naive";
         strcat(filepath, filename);
-    } else if (reduceFunc == Vertexset_Allreduce_Dense) {
+    } else if (reduceFunc == Vertexset_Allreduce_Butterfly) {
         char filename[] = "dense";
         strcat(filepath, filename);
     } else {
@@ -120,6 +120,7 @@ void performance_sizeSeries(void (*reduceFunc) (Vertexset*, int), float filling)
     // init sparse array
     int sparseSize, sparseSizeMax;
     int32_t *sparseArray, *sparseBuffer;
+    bool shiftPattern = (size & (size - 1)) != 0;
     int sizesAll[size];
     int displ[size + 1];
     sparseSizeMax = (int)(sizes[N-1] * filling);
@@ -135,7 +136,8 @@ void performance_sizeSeries(void (*reduceFunc) (Vertexset*, int), float filling)
         // collect more than one data point for each configuration
         for (size_t j = 0; j < N_DATAPOINTS; j++) {
             // init vertex set
-            Vertexset_Init(&vs, setSize, MPI_COMM_WORLD);
+            
+            Vertexset_Init(&vs, setSize, MPI_COMM_WORLD, shiftPattern);
 
             size_bitarray = (setSize + (sizeof(unsigned long long)*8)) / (sizeof(unsigned long long)*8);
 
@@ -152,7 +154,7 @@ void performance_sizeSeries(void (*reduceFunc) (Vertexset*, int), float filling)
             }
 
             // reduce Vertexset
-            if (reduceFunc == Vertexset_Allreduce_Dense) {
+            if (reduceFunc == Vertexset_Allreduce_Butterfly) {
                 Vertexset_TransformToDense(&vs);
             }
             MPI_Barrier(MPI_COMM_WORLD);
@@ -273,6 +275,7 @@ void performance_fillingSeries(void (*reduceFunc) (Vertexset*, int), int setSize
     int32_t *sparseArray, *sparseBuffer;
     int sizesAll[size];
     int displ[size + 1];
+    bool shiftPattern =  (size & (size - 1)) != 0;
     sparseSizeMax = (int)(setSize);
     sparseArray = (int32_t*) malloc(sparseSizeMax * sizeof(int32_t));
     sparseBuffer = (int32_t*) malloc(sparseSizeMax * sizeof(int32_t));
@@ -285,7 +288,7 @@ void performance_fillingSeries(void (*reduceFunc) (Vertexset*, int), int setSize
         // collect more than one data point for each configuration
         for (size_t j = 0; j < N_DATAPOINTS; j++) {
             // init vertex set
-            Vertexset_Init(&vs, setSize, MPI_COMM_WORLD);
+            Vertexset_Init(&vs, setSize, MPI_COMM_WORLD, shiftPattern);
 
             // fill arrays
             sparseSize = 0;
@@ -300,7 +303,7 @@ void performance_fillingSeries(void (*reduceFunc) (Vertexset*, int), int setSize
             }
 
             // reduce Vertexset
-            if (reduceFunc == Vertexset_Allreduce_Dense) {
+            if (reduceFunc == Vertexset_Allreduce_Butterfly) {
                 Vertexset_TransformToDense(&vs);
             }
             MPI_Barrier(MPI_COMM_WORLD);
@@ -391,47 +394,47 @@ int main(int argc, char *argv[]){
 
     switch (testNumber) {
     // perf_red_exactHalfing: measure performance of allreduce 
-    case EXACT_HALFING:
+    case UNION_BUTTERFLY:
         if (rank==0) {
             printf("-------------------------------------------------------------\n");
-            printf("Testing performance of Vertexset_Allreduce_Exact_Halfing...\n");
+            printf("Testing performance of Vertexset_Allreduce_Union_Butterfly...\n");
             printf("-------------------------------------------------------------\n");
         }
-        performance_sizeSeries(Vertexset_Allreduce_Exact_Halfing, SETFILLING);
-        performance_fillingSeries(Vertexset_Allreduce_Exact_Halfing, SETSIZE);
+        performance_sizeSeries(Vertexset_Union_Butterfly, SETFILLING);
+        performance_fillingSeries(Vertexset_Union_Butterfly, SETSIZE);
         break;
 
     // perf_red_approxHalfing: measure performance of allreduce 
-    case APROXIMATE_HALFING:
+    case UNION_SHIFT:
         if (rank==0) {
             printf("-------------------------------------------------------------\n");
-            printf("Testing performance of Vertexset_Allreduce_Approximate_Halfing...\n");
+            printf("Testing performance of Vertexset_Union_Shift...\n");
             printf("-------------------------------------------------------------\n");
         }        
-        performance_sizeSeries(Vertexset_Allreduce_Approximate_Halfing, SETFILLING);
-        performance_fillingSeries(Vertexset_Allreduce_Approximate_Halfing, SETSIZE);
+        performance_sizeSeries(Vertexset_Union_Shift, SETFILLING);
+        performance_fillingSeries(Vertexset_Union_Shift, SETSIZE);
         break;
 
     // measure peprformance of ring comm reduce
-    case NAIVE:
+    case UNION_NAIVE:
         if (rank==0) {
             printf("-------------------------------------------------------------\n");
             printf("Testing performance of Vertexset_Allreduce_Naive...\n");
             printf("-------------------------------------------------------------\n");
         }
-        performance_sizeSeries(Vertexset_Allreduce_Naive, SETFILLING);
-        performance_fillingSeries(Vertexset_Allreduce_Naive, SETSIZE);
+        performance_sizeSeries(Union_Allreduce_Naive, SETFILLING);
+        performance_fillingSeries(Union_Allreduce_Naive, SETSIZE);
         break;
 
     // measure peprformance of dense reduce
-    case DENSE:
+    case ALLREDUCE_BUTTERFLY:
         if (rank==0) {
             printf("-------------------------------------------------------------\n");
-            printf("Testing performance of Vertexset_Allreduce_Dense...\n");
+            printf("Testing performance of Vertexset_Allreduce_Butterfly...\n");
             printf("-------------------------------------------------------------\n");
         }
-        performance_sizeSeries(Vertexset_Allreduce_Dense, SETFILLING);
-        performance_fillingSeries(Vertexset_Allreduce_Dense, SETSIZE);
+        performance_sizeSeries(Vertexset_Allreduce_Butterfly, SETFILLING);
+        performance_fillingSeries(Vertexset_Allreduce_Butterfly, SETSIZE);
         break;
 
     default:

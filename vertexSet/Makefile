@@ -26,7 +26,7 @@ test_red_exactHalfing: test
 	mpirun -np 4 ./$(build)/test.o 1
 
 test_red_approxHalfing: test
-	mpirun -np 3 ./$(build)/test.o 2
+	mpirun -np 4 ./$(build)/test.o 2
 
 test_red_naive: test
 	mpirun -np 4 ./$(build)/test.o 3
@@ -39,7 +39,7 @@ test_vertexset: test
 	mpirun -np 1 ./$(build)/test.o 5
 
 test_allgather: test
-	mpirun -np 3 ./$(build)/test.o 6
+	mpirun -np 4 ./$(build)/test.o 10
 
 perf: performance.c
 	$(GCC) $(CFLAGS) -o $(build)/perf.o performance.c $(SOURCES)
