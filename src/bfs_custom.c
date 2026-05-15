@@ -18,7 +18,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#define SHIFTPATTERN true
+
 #define SHIFT 
 
 int64_t *column;
@@ -26,12 +26,11 @@ int64_t *pred_glob;
 unsigned int * rowstarts;
 
 int64_t visited_size;
-unsigned long *visited;
+unsigned long long *visited;
 Vertexset *frontierOld, *frontierNew, *temp;
 int64_t* predsAllRanks;
 
 int64_t  nglobalverts;
-size_t edgeCount;
 oned_csr_graph g;
 distributedGraph_CSR graph;
 
@@ -49,13 +48,18 @@ void make_graph_data_structure(const tuple_graph* const tg) {
 
 	// init bitmap
 	visited_size = (nglobalverts + ulong_bits - 1) / ulong_bits;
-	visited = malloc(visited_size*sizeof(unsigned long));
+	visited = malloc(visited_size*sizeof(unsigned long long));
 
 	// init VertexSets
 	frontierNew = (Vertexset*) malloc(sizeof(Vertexset));
 	frontierOld = (Vertexset*) malloc(sizeof(Vertexset));
-	Vertexset_Init(frontierOld, nglobalverts, MPI_COMM_WORLD, SHIFTPATTERN);
-	Vertexset_Init(frontierNew, nglobalverts, MPI_COMM_WORLD, SHIFTPATTERN);
+	#ifdef SHIFT
+	Vertexset_Init(frontierOld, nglobalverts, MPI_COMM_WORLD, true);
+	Vertexset_Init(frontierNew, nglobalverts, MPI_COMM_WORLD, true);
+	#else
+	Vertexset_Init(frontierOld, nglobalverts, MPI_COMM_WORLD, false);
+	Vertexset_Init(frontierNew, nglobalverts, MPI_COMM_WORLD, false);
+	#endif // SHIFT
 
 	// init pred array
 	predsAllRanks  = (int64_t*) malloc(nglobalverts * sizeof(int64_t));
@@ -76,7 +80,7 @@ bool Vertexset_isFilled(Vertexset* vs){
 	return vs->isdense + vs->sizeSparse;
 }
 
-void Bitmap_UnionWithVertexset(unsigned long* bitmap, Vertexset* vs){
+void Bitmap_UnionWithVertexset(unsigned long long* bitmap, Vertexset* vs){
 	if (vs->isdense) {
 		// dense variant
 		for (size_t i = 0; i < vs->size_bitarray; i++) {
@@ -87,7 +91,12 @@ void Bitmap_UnionWithVertexset(unsigned long* bitmap, Vertexset* vs){
 		uint32_t vert;
 		for (size_t i = 0; i < vs->sizeSparse; i++) {
 			vert = vs->sparseArray[i];
+			
+	#ifdef SHIFT
+			Bitmap_Set_Shifted(bitmap, vert, vs->indexShift, vs->size_bitarray);
+	#else
 			Bitmap_Set(bitmap, vert);
+	#endif //SHIFT
 		}
 	}
 	
@@ -97,36 +106,46 @@ void Bitmap_UnionWithVertexset(unsigned long* bitmap, Vertexset* vs){
 //pred[] should be root for root, -1 for unrechable vertices
 //prior to calling run_bfs pred is set to -1 by calling clean_pred
 void run_bfs(int64_t root, int64_t* pred) {
+	// get values for shifted bitmap
+	int bitmapShift = frontierNew->indexShift;
+	assert(visited_size == frontierNew->size_bitarray);
+
+	// clean data structures
+	Bitmap_Clean(visited, visited_size);
+	Vertexset_Clean(frontierOld);
+	Vertexset_Clean(frontierNew);
 
 	// set in root
-	Bitmap_Clean(visited, visited_size);
-	Bitmap_Set(visited, root);
 	Vertexset_Add(frontierOld, root);
-
 	predsAllRanks[root] = root;
 
 	vertexSetIterator it;
 	uint32_t vert, neigh;
 	while (Vertexset_isFilled(frontierOld)) {
-		vertexSetIterator_Init(&it, frontierOld);
-		while (vertexSetIterator_Has_next(&it)) {
-			vert = vertexSetIterator_Next(&it);
-			Bitmap_Set(visited, vert);
-		}
+		Bitmap_UnionWithVertexset(visited, frontierOld);
 		vertexSetIterator_Init(&it, frontierOld);
 		while (vertexSetIterator_Has_next(&it)) {
 			vert = vertexSetIterator_Next(&it);			
 			for (uint64_t i = NEIGHSTART((&graph), vert); i < NEIGHEND((&graph),vert); i++) {
 				neigh = graph.data[i];
+	#ifdef SHIFT
+				if (!Bitmap_Test_Shifted(visited, neigh, bitmapShift, visited_size)) {
+					Bitmap_Set_Shifted(visited, neigh, bitmapShift, visited_size);
+	#else
 				if (!Bitmap_Test(visited, neigh)) {
-					edgeCount ++;
 					Bitmap_Set(visited, neigh);
+	#endif //SHIFT
 					Vertexset_Add(frontierNew, neigh);
 					predsAllRanks[neigh] = vert;
 				}
 			}
 		}
+	#ifdef SHIFT
 		Vertexset_Union_Shift(frontierNew, VERTEXSET_OR);
+	#else
+		Vertexset_Union_Butterfly(frontierNew, VERTEXSET_OR);
+	#endif // SHIFT
+	
 		
 
 		//swap Vertexsets
@@ -177,6 +196,7 @@ void clean_pred(int64_t* pred) {
 	for (size_t i = 0; i < nglobalverts; i++) {
 		predsAllRanks[i] = -1;
 	}
+
 
 }
 

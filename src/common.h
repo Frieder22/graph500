@@ -51,7 +51,7 @@ typedef struct tuple_graph {
 	int64_t max_edgememory_size;
 	MPI_File edgefile; /* Or MPI_FILE_NULL if edges are in memory */
 	uint64_t nglobaledges; /* Number of edges in graph, in both cases */
-	uint64_t nlocaledeges;
+	uint64_t nlocaledges;
 #ifdef SSSP
 	float* restrict weightmemory;
 	MPI_File weightfile;

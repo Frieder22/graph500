@@ -31,7 +31,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 
-#define N_BFS 1
+#define N_BFS 64
 
 int isisolated(int64_t v);
 static int compare_doubles(const void* a, const void* b) {

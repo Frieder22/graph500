@@ -27,10 +27,10 @@ graph500_custom_bfs_sssp: bfs_custom.c sssp_custom.c $(SOURCES) $(HEADERS) $(GEN
 	$(MPICC) $(CFLAGS) $(LDFLAGS) -o graph500_custom_bfs_sssp bfs_custom.c sssp_custom.c csr_reference.c $(SOURCES) $(GENERATOR_SOURCES) -lm
 
 run: graph500_custom_bfs
-	mpirun -np 4 graph500_custom_bfs 12
+	mpirun -np 4 graph500_custom_bfs 19
 
 run_ref: graph500_reference_bfs
-	mpirun -np 4 graph500_reference_bfs 7
+	mpirun -np 4 graph500_reference_bfs 20
 
 clean:
 	-rm -f graph500_*

@@ -22,6 +22,7 @@
 #include <limits.h>
 #include <assert.h>
 #include <stdint.h>
+#include "csr_custom.h"
 
 #ifdef DEBUGSTATS
 extern int64_t nbytes_sent,nbytes_rcvd;
@@ -41,6 +42,8 @@ int64_t *pred_glob;
 unsigned int * rowstarts;
 
 oned_csr_graph g;
+int64_t  nglobalverts;
+distributedGraph_CSR graph;
 
 typedef struct visitmsg {
 	//both vertexes are VERTEX_LOCAL components as we know src and dest PEs to reconstruct VERTEX_GLOBAL
@@ -68,7 +71,8 @@ void make_graph_data_structure(const tuple_graph* const tg) {
 	convert_graph_to_oned_csr(tg, &g);
 	column=g.column;
 	rowstarts=g.rowstarts;
-
+ 	nglobalverts = g.nglobalverts - 1;
+	createDistributedGraph(tg, &graph, nglobalverts);
 	visited_size = (g.nlocalverts + ulong_bits - 1) / ulong_bits;
 	aml_register_handler(visithndl,1);
 	q1 = xmalloc(g.nlocalverts*sizeof(int)); //100% of vertexes
